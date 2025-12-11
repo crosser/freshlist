@@ -1,6 +1,6 @@
 set(srcs
-	"lvgl_esplcd.c"
-	"lvgl_demo_ui.c"
+	"freshlist.c"
+	"browser.c"
 )
 
 idf_component_register(
