@@ -40,7 +40,8 @@
 
 #define LV_TICK_PERIOD_MS 1
 
-extern void example_lvgl_demo_ui(lv_display_t *disp);
+extern void init_browser(lv_display_t *disp);
+extern void stop_browser(lv_display_t *disp);
 
 static volatile int stop_request = 0;
 
@@ -191,7 +192,7 @@ static void gui_task(void *pvParameter)
 			}));
 
 	ESP_LOGI(TAG, "Display LVGL Scroll Text");
-	example_lvgl_demo_ui(disp);
+	init_browser(disp);
 	while (stop_request < 1) {
 		vTaskDelay(pdMS_TO_TICKS(10));
 		if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY)) {
@@ -206,6 +207,7 @@ static void gui_task(void *pvParameter)
 		if (!lvl) stop_request++;
 	}
 	ESP_LOGI(TAG, "Shutting down");
+	stop_browser(disp);
 	ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, false));
 	ESP_ERROR_CHECK(gpio_set_level(CONFIG_HWE_DISPLAY_PWR,
 				!CONFIG_HWE_DISPLAY_PWR_ON_LEVEL));
