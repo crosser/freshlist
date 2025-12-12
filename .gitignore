@@ -1,4 +1,5 @@
 build/
+credentials.h
 dependencies.lock
 managed_components/
 sdkconfig

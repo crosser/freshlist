@@ -15,6 +15,26 @@
 #include <nvs_flash.h>
 #include <lvgl.h>
 
+#if defined __has_include
+#  if __has_include("../credentials.h")
+#    include "../credentials.h"
+#  endif
+#endif
+
+#include "sdkconfig.h"
+
+#ifdef LOCAL_WIFI_SSID
+#  define WIFI_SSID LOCAL_WIFI_SSID
+#else
+#  define WIFI_SSID CONFIG_WIFI_SSID
+#endif
+
+#ifdef LOCAL_WPA_PASSWORD
+#  define WPA_PASSWORD LOCAL_WPA_PASSWORD
+#else
+#  define WPA_PASSWORD CONFIG_WPA_PASSWORD
+#endif
+
 static const char *TAG = "browser";
 
 /* Create a pseudo lv_color_t that will produce byte-swapped r5g6b5 */
@@ -109,8 +129,8 @@ static void wifi_init_sta(void)
 	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,
 		       	&(wifi_config_t){
 				.sta = {
-					.ssid = "CHANGE THIS",
-					.password = "CHANGE THIS",
+					.ssid = WIFI_SSID,
+					.password = WPA_PASSWORD,
 				},
 			}));
 	ESP_ERROR_CHECK(esp_wifi_start());

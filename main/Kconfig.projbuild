@@ -96,3 +96,13 @@ menu "Hardware Environment (PINS, screen, etc.)"
 		default 21
 
 endmenu
+
+menu "WiFi name and WPAx password"
+
+	config WIFI_SSID
+		string "SSID to connect"
+
+	config WPA_PASSWORD
+		string "WPA[2,3] Password"
+
+endmenu
