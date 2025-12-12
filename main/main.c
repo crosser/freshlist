@@ -183,9 +183,9 @@ static void gui_task(void *pvParameter)
 				.intr_type = GPIO_INTR_DISABLE,
 			}));
 
-	init_wifi();
 	ESP_LOGI(TAG, "Display LVGL Scroll Text");
-	init_browser(disp);
+	void *drawhdl = init_browser(disp);
+	init_wifi(drawhdl);
 	while (stop_request < 1) {
 		vTaskDelay(pdMS_TO_TICKS(10));
 		if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY)) {
@@ -200,8 +200,8 @@ static void gui_task(void *pvParameter)
 		if (!lvl) stop_request++;
 	}
 	ESP_LOGI(TAG, "Shutting down");
-	stop_browser(disp);
 	stop_wifi();
+	stop_browser(disp);
 	ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, false));
 	ESP_ERROR_CHECK(gpio_set_level(CONFIG_HWE_DISPLAY_PWR,
 				!CONFIG_HWE_DISPLAY_PWR_ON_LEVEL));

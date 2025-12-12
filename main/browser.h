@@ -3,7 +3,8 @@
 
 #include <lvgl.h>
 
-void init_browser(lv_display_t *disp);
+void *init_browser(lv_display_t *disp);
 void stop_browser(lv_display_t *disp);
+void draw(void *hdl, char *msg);
 
 #endif

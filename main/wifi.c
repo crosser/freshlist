@@ -14,6 +14,7 @@
 #include <lwip/err.h>
 #include <nvs_flash.h>
 #include "wifi.h"
+#include "browser.h"
 
 #if defined __has_include
 #  if __has_include("../credentials.h")
@@ -74,6 +75,11 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 	case IP_EVENT_STA_GOT_IP:
 		ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
 		ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+		char buf[32];
+		snprintf(buf, sizeof(buf), IPSTR "\nline 2\n  line3",
+				IP2STR(&event->ip_info.ip));
+		ESP_LOGI(TAG, "Prepare buf \"%s\", hdl %p", buf, arg);
+		draw(arg, buf);
 		xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
 		break;
 	default:
@@ -82,7 +88,7 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 	}
 }
 
-void init_wifi(void)
+void init_wifi(void *drawhdl)
 {
 	esp_err_t ret = nvs_flash_init();
 	if (ret == ESP_ERR_NVS_NO_FREE_PAGES
@@ -100,9 +106,9 @@ void init_wifi(void)
 	ESP_ERROR_CHECK(esp_wifi_init(
 			&(wifi_init_config_t)WIFI_INIT_CONFIG_DEFAULT()));
 	ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,
-			ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+			ESP_EVENT_ANY_ID, &wifi_event_handler, drawhdl));
 	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,
-			IP_EVENT_STA_GOT_IP, &ip_event_handler, NULL));
+			IP_EVENT_STA_GOT_IP, &ip_event_handler, drawhdl));
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,
 		       	&(wifi_config_t){
