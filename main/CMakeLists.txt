@@ -1,6 +1,7 @@
 set(srcs
-	"freshlist.c"
+	"main.c"
 	"browser.c"
+	"wifi.c"
 )
 
 idf_component_register(
