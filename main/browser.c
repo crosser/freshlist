@@ -90,9 +90,15 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 		case WIFI_EVENT_STA_START:
 			esp_wifi_connect();
 			break;
+		case WIFI_EVENT_STA_CONNECTED:
+			ESP_LOGI(TAG, "connect succeeded");
+			break;
 		case WIFI_EVENT_STA_DISCONNECTED:
 			xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
 			ESP_LOGI(TAG, "connect failed");
+			break;
+		case WIFI_EVENT_HOME_CHANNEL_CHANGE:
+			ESP_LOGI(TAG, "channel change");
 			break;
 		default:
 			ESP_LOGI(TAG, "unexpected wifi event id %d", event_id);
