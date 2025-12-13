@@ -38,25 +38,36 @@
 
 static const char *TAG = "wifi";
 
-#define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT      BIT1
+#define HAVE_IPV4 BIT0
+#define HAVE_IPV6 BIT1
+#define WIFI_FAIL BIT2
 
+static int retries;
+static esp_netif_t *wifi_netif;
 static EventGroupHandle_t s_wifi_event_group;
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		int32_t event_id, void* event_data)
 {
 	assert(event_base == WIFI_EVENT);
+
 	switch (event_id) {
 	case WIFI_EVENT_STA_START:
 		esp_wifi_connect();
 		break;
 	case WIFI_EVENT_STA_CONNECTED:
 		ESP_LOGI(TAG, "connect succeeded");
+		// Have to do this by hand for SLAAC to work!?
+		ESP_ERROR_CHECK(esp_netif_create_ip6_linklocal(wifi_netif));
 		break;
 	case WIFI_EVENT_STA_DISCONNECTED:
-		xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
 		ESP_LOGI(TAG, "connect failed");
+		if (retries-- > 0) {
+			ESP_LOGI(TAG, "retries left: %d", retries);
+			esp_wifi_connect();
+		} else {
+			xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL);
+		}
 		break;
 	case WIFI_EVENT_HOME_CHANNEL_CHANGE:
 		ESP_LOGI(TAG, "channel change");
@@ -71,16 +82,31 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 		int32_t event_id, void* event_data)
 {
 	assert(event_base == IP_EVENT);
+#if 0
+	char buf[40];  // Enough for IPv6 address
+#endif
 	switch (event_id) {
 	case IP_EVENT_STA_GOT_IP:
-		ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-		ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
-		char buf[32];
-		snprintf(buf, sizeof(buf), IPSTR "\nline 2\n  line3",
+		ip_event_got_ip_t *event = (ip_event_got_ip_t*) event_data;
+		ESP_LOGI(TAG, "got ipv4:" IPSTR,
 				IP2STR(&event->ip_info.ip));
-		ESP_LOGI(TAG, "Prepare buf \"%s\", hdl %p", buf, arg);
+#if 0
+		snprintf(buf, sizeof(buf),
+				IPSTR, IP2STR(&event->ip_info.ip));
 		draw(arg, buf);
-		xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+#endif
+		xEventGroupSetBits(s_wifi_event_group, HAVE_IPV4);
+		break;
+	case IP_EVENT_GOT_IP6:
+		ip_event_got_ip6_t *event6 = (ip_event_got_ip6_t*) event_data;
+		ESP_LOGI(TAG, "got ipv6:" IPV6STR,
+				IPV62STR(event6->ip6_info.ip));
+#if 0
+		snprintf(buf, sizeof(buf),
+				IPV6STR, IPV62STR(event6->ip6_info.ip));
+		draw(arg, buf);
+#endif
+		xEventGroupSetBits(s_wifi_event_group, HAVE_IPV6);
 		break;
 	default:
 		ESP_LOGI(TAG, "unexpected ip event id %d", event_id);
@@ -102,13 +128,15 @@ void init_wifi(void *drawhdl)
 
 	ESP_ERROR_CHECK(esp_netif_init());
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
-	esp_netif_create_default_wifi_sta();
+	wifi_netif = esp_netif_create_default_wifi_sta();
 	ESP_ERROR_CHECK(esp_wifi_init(
 			&(wifi_init_config_t)WIFI_INIT_CONFIG_DEFAULT()));
 	ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,
 			ESP_EVENT_ANY_ID, &wifi_event_handler, drawhdl));
 	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,
 			IP_EVENT_STA_GOT_IP, &ip_event_handler, drawhdl));
+	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,
+			IP_EVENT_GOT_IP6, &ip_event_handler, drawhdl));
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,
 		       	&(wifi_config_t){
@@ -117,30 +145,36 @@ void init_wifi(void *drawhdl)
 					.password = WPA_PASSWORD,
 				},
 			}));
+	retries = 2;
 	ESP_ERROR_CHECK(esp_wifi_start());
 	ESP_LOGI(TAG, "wifi_init_sta finished.");
 	EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-			WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+			HAVE_IPV4 | HAVE_IPV6 | WIFI_FAIL,
 			pdFALSE,
 			pdFALSE,
-			portMAX_DELAY);
+			5000 / portTICK_PERIOD_MS);  // 1s
 
-	if (bits & WIFI_CONNECTED_BIT) {
-		ESP_LOGI(TAG, "connected to ap");
-	} else if (bits & WIFI_FAIL_BIT) {
+	if (bits & HAVE_IPV4) {
+		ESP_LOGI(TAG, "connected with IPv4");
+	} else if (bits & HAVE_IPV6) {
+		ESP_LOGI(TAG, "connected with IPv6");
+	} else if (bits & WIFI_FAIL) {
 		ESP_LOGI(TAG, "Failed to connect to ap");
 	} else {
-		ESP_LOGE(TAG, "UNEXPECTED EVENT");
+		ESP_LOGE(TAG, "Timed out");
 	}
 }
 
 void stop_wifi(void)
 {
 	ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT,
+				IP_EVENT_GOT_IP6, &ip_event_handler));
+	ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT,
 				IP_EVENT_STA_GOT_IP, &ip_event_handler));
 	ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT,
 				ESP_EVENT_ANY_ID, &wifi_event_handler));
 	vEventGroupDelete(s_wifi_event_group);
 	esp_wifi_stop();
+	vEventGroupDelete(s_wifi_event_group);
 	ESP_LOGI(TAG, "WiFi stopped");
 }
