@@ -1,6 +1,6 @@
 set(srcs
 	"main.c"
-	"browser.c"
+	"display.c"
 	"wifi.c"
 )
 

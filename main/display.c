@@ -6,9 +6,9 @@
 
 #include <esp_log.h>
 #include <lvgl.h>
-#include "browser.h"
+#include "display.h"
 
-static const char *TAG = "browser";
+static const char *TAG = "display";
 
 /* Create a pseudo lv_color_t that will produce byte-swapped r5g6b5 */
 static lv_color_t c_swap(lv_color_t o)
@@ -34,7 +34,7 @@ static lv_color_t c_swap(lv_color_t o)
 
 static lv_obj_t *label;
 
-void *init_browser(lv_display_t *disp)
+void *init_display(lv_display_t *disp)
 {
     lv_obj_t *scr = lv_display_get_screen_active(disp);
     label = lv_label_create(scr);
@@ -56,7 +56,7 @@ void *init_browser(lv_display_t *disp)
     return (void *)label;
 }
 
-void stop_browser(lv_display_t *disp)
+void stop_display(lv_display_t *disp)
 {
 	return;
 }

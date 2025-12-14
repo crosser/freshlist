@@ -14,7 +14,7 @@
 #include <lwip/err.h>
 #include <nvs_flash.h>
 #include "wifi.h"
-#include "browser.h"
+#include "display.h"
 
 #if defined __has_include
 #  if __has_include("../credentials.h")

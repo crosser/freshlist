@@ -17,7 +17,7 @@
 #include "esp_lcd_panel_rm67162.h"
 #include "sdkconfig.h"
 #include "wifi.h"
-#include "browser.h"
+#include "display.h"
 
 #define TAG "lvgl_esplcd"
 
@@ -184,7 +184,7 @@ static void gui_task(void *pvParameter)
 			}));
 
 	ESP_LOGI(TAG, "Display LVGL Scroll Text");
-	void *drawhdl = init_browser(disp);
+	void *drawhdl = init_display(disp);
 	init_wifi(drawhdl);
 	while (stop_request < 1) {
 		vTaskDelay(pdMS_TO_TICKS(10));
@@ -201,7 +201,7 @@ static void gui_task(void *pvParameter)
 	}
 	ESP_LOGI(TAG, "Shutting down");
 	stop_wifi();
-	stop_browser(disp);
+	stop_display(disp);
 	ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, false));
 	ESP_ERROR_CHECK(gpio_set_level(CONFIG_HWE_DISPLAY_PWR,
 				!CONFIG_HWE_DISPLAY_PWR_ON_LEVEL));
