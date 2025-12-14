@@ -2,6 +2,7 @@ set(srcs
 	"main.c"
 	"display.c"
 	"wifi.c"
+	"httpc.c"
 )
 
 idf_component_register(

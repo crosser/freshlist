@@ -15,6 +15,7 @@
 #include <nvs_flash.h>
 #include "wifi.h"
 #include "display.h"
+#include "httpc.h"
 
 #if defined __has_include
 #  if __has_include("../credentials.h")
@@ -162,6 +163,11 @@ void init_wifi(void *drawhdl)
 		ESP_LOGI(TAG, "Failed to connect to ap");
 	} else {
 		ESP_LOGE(TAG, "Timed out");
+	}
+	if (bits & (HAVE_IPV4 | HAVE_IPV6)) {
+		httpc(drawhdl);
+	} else {
+		draw(drawhdl, "Failed to connect to the Internet");
 	}
 }
 
