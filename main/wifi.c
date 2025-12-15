@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: CC0-1.0
  */
 
+#include <time.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <esp_system.h>
 #include <esp_log.h>
 #include <esp_event.h>
 #include <esp_wifi.h>
+#include <esp_netif_sntp.h>
 #include <esp_netif_net_stack.h>
 #include <lwip/sys.h>
 #include <lwip/err.h>
@@ -162,7 +164,20 @@ void init_wifi(void *drawhdl)
 		ESP_LOGE(TAG, "Timed out");
 	}
 	if (bits & (HAVE_IPV4 | HAVE_IPV6)) {
+		ESP_ERROR_CHECK(esp_netif_sntp_init(
+			&(esp_sntp_config_t)ESP_NETIF_SNTP_DEFAULT_CONFIG(
+				"pool.ntp.org"
+			)));
 		httpc(drawhdl);
+		ESP_ERROR_CHECK(esp_netif_sntp_sync_wait(
+					pdMS_TO_TICKS(5000)));
+		time_t now;
+		struct tm timeinfo;
+		char strftime_buf[64];
+		time(&now);
+		gmtime_r(&now, &timeinfo);
+		strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+		ESP_LOGI(TAG, "Current time: %s GMT", strftime_buf);
 	} else {
 		draw(drawhdl, "Failed to connect to the Internet");
 	}
