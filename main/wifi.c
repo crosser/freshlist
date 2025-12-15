@@ -10,8 +10,10 @@
 #include <esp_log.h>
 #include <esp_event.h>
 #include <esp_wifi.h>
+#include <esp_netif_net_stack.h>
 #include <lwip/sys.h>
 #include <lwip/err.h>
+#include <lwip/dhcp6.h>
 #include <nvs_flash.h>
 #include "wifi.h"
 #include "display.h"
@@ -63,6 +65,8 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		ESP_LOGI(TAG, "Connected");
 		// Have to do this by hand for SLAAC to work!?
 		ESP_ERROR_CHECK(esp_netif_create_ip6_linklocal(wifi_netif));
+		ESP_ERROR_CHECK(dhcp6_enable_stateless(
+				esp_netif_get_netif_impl(wifi_netif)));
 		break;
 	case WIFI_EVENT_STA_DISCONNECTED:
 		ESP_LOGI(TAG, "Disconnected");
@@ -97,7 +101,11 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 		ip_event_got_ip6_t *event6 = (ip_event_got_ip6_t*) event_data;
 		ESP_LOGI(TAG, "got ipv6:" IPV6STR,
 				IPV62STR(event6->ip6_info.ip));
-		xEventGroupSetBits(s_wifi_event_group, HAVE_IPV6);
+		if (esp_netif_ip6_get_addr_type(&event6->ip6_info.ip)
+				== ESP_IP6_ADDR_IS_GLOBAL) {
+			ESP_LOGI(TAG, "It is global, can use!");
+			xEventGroupSetBits(s_wifi_event_group, HAVE_IPV6);
+		}
 		break;
 	default:
 		ESP_LOGI(TAG, "unexpected ip event id %d", event_id);
