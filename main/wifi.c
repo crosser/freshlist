@@ -56,13 +56,16 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 	case WIFI_EVENT_STA_START:
 		esp_wifi_connect();
 		break;
+	case WIFI_EVENT_STA_STOP:
+		ESP_LOGI(TAG, "Stopped");
+		break;
 	case WIFI_EVENT_STA_CONNECTED:
-		ESP_LOGI(TAG, "connect succeeded");
+		ESP_LOGI(TAG, "Connected");
 		// Have to do this by hand for SLAAC to work!?
 		ESP_ERROR_CHECK(esp_netif_create_ip6_linklocal(wifi_netif));
 		break;
 	case WIFI_EVENT_STA_DISCONNECTED:
-		ESP_LOGI(TAG, "connect failed");
+		ESP_LOGI(TAG, "Disconnected");
 		if (retries-- > 0) {
 			ESP_LOGI(TAG, "retries left: %d", retries);
 			esp_wifi_connect();
@@ -71,10 +74,10 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		}
 		break;
 	case WIFI_EVENT_HOME_CHANNEL_CHANGE:
-		ESP_LOGI(TAG, "channel change");
+		ESP_LOGI(TAG, "Channel change");
 		break;
 	default:
-		ESP_LOGI(TAG, "unexpected wifi event id %d", event_id);
+		ESP_LOGI(TAG, "Unexpected wifi event id %d", event_id);
 		break;
 	}
 }
@@ -83,30 +86,17 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 		int32_t event_id, void* event_data)
 {
 	assert(event_base == IP_EVENT);
-#if 0
-	char buf[40];  // Enough for IPv6 address
-#endif
 	switch (event_id) {
 	case IP_EVENT_STA_GOT_IP:
 		ip_event_got_ip_t *event = (ip_event_got_ip_t*) event_data;
 		ESP_LOGI(TAG, "got ipv4:" IPSTR,
 				IP2STR(&event->ip_info.ip));
-#if 0
-		snprintf(buf, sizeof(buf),
-				IPSTR, IP2STR(&event->ip_info.ip));
-		draw(arg, buf);
-#endif
 		xEventGroupSetBits(s_wifi_event_group, HAVE_IPV4);
 		break;
 	case IP_EVENT_GOT_IP6:
 		ip_event_got_ip6_t *event6 = (ip_event_got_ip6_t*) event_data;
 		ESP_LOGI(TAG, "got ipv6:" IPV6STR,
 				IPV62STR(event6->ip6_info.ip));
-#if 0
-		snprintf(buf, sizeof(buf),
-				IPV6STR, IPV62STR(event6->ip6_info.ip));
-		draw(arg, buf);
-#endif
 		xEventGroupSetBits(s_wifi_event_group, HAVE_IPV6);
 		break;
 	default:
@@ -168,6 +158,9 @@ void init_wifi(void *drawhdl)
 	} else {
 		draw(drawhdl, "Failed to connect to the Internet");
 	}
+	retries = 0;
+	ESP_ERROR_CHECK(esp_wifi_disconnect());
+	ESP_ERROR_CHECK(esp_wifi_stop());
 }
 
 void stop_wifi(void)
@@ -178,7 +171,7 @@ void stop_wifi(void)
 				IP_EVENT_STA_GOT_IP, &ip_event_handler));
 	ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT,
 				ESP_EVENT_ANY_ID, &wifi_event_handler));
-	esp_wifi_stop();
+	ESP_ERROR_CHECK(esp_wifi_stop());
 	vEventGroupDelete(s_wifi_event_group);
 	ESP_LOGI(TAG, "WiFi stopped");
 }
