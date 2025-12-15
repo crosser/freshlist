@@ -125,10 +125,10 @@ void init_wifi(void *drawhdl)
 	}
 	ESP_ERROR_CHECK(ret);
 	ESP_LOGI(TAG, "Starting WiFi");
+	retries = 2;
 	s_wifi_event_group = xEventGroupCreate();
 
 	ESP_ERROR_CHECK(esp_netif_init());
-	ESP_ERROR_CHECK(esp_event_loop_create_default());
 	wifi_netif = esp_netif_create_default_wifi_sta();
 	ESP_ERROR_CHECK(esp_wifi_init(
 			&(wifi_init_config_t)WIFI_INIT_CONFIG_DEFAULT()));
@@ -146,7 +146,6 @@ void init_wifi(void *drawhdl)
 					.password = WPA_PASSWORD,
 				},
 			}));
-	retries = 2;
 	ESP_ERROR_CHECK(esp_wifi_start());
 	ESP_LOGI(TAG, "wifi_init_sta finished.");
 	EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
@@ -179,7 +178,6 @@ void stop_wifi(void)
 				IP_EVENT_STA_GOT_IP, &ip_event_handler));
 	ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT,
 				ESP_EVENT_ANY_ID, &wifi_event_handler));
-	vEventGroupDelete(s_wifi_event_group);
 	esp_wifi_stop();
 	vEventGroupDelete(s_wifi_event_group);
 	ESP_LOGI(TAG, "WiFi stopped");

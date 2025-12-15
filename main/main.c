@@ -13,6 +13,7 @@
 #include <esp_log.h>
 #include <esp_sleep.h>
 #include <esp_timer.h>
+#include <esp_event.h>
 #include <lvgl.h>
 #include "esp_lcd_panel_rm67162.h"
 #include "sdkconfig.h"
@@ -71,6 +72,7 @@ SemaphoreHandle_t xGuiSemaphore;
 
 static void gui_task(void *pvParameter)
 {
+	ESP_ERROR_CHECK(esp_event_loop_create_default());
 	xGuiSemaphore = xSemaphoreCreateMutex();
 	ESP_LOGI(TAG, "Power up AMOLED");
 	ESP_ERROR_CHECK(gpio_set_direction(CONFIG_HWE_DISPLAY_PWR,
@@ -205,6 +207,7 @@ static void gui_task(void *pvParameter)
 	ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, false));
 	ESP_ERROR_CHECK(gpio_set_level(CONFIG_HWE_DISPLAY_PWR,
 				!CONFIG_HWE_DISPLAY_PWR_ON_LEVEL));
+	ESP_ERROR_CHECK(esp_event_loop_delete_default());
 	esp_deep_sleep_start();
 }
 
