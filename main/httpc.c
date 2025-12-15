@@ -3,6 +3,7 @@
 // #include <esp_tls.h>
 #include "httpc.h"
 #include "display.h"
+#include "sdkconfig.h"
 
 #define TAG "httpc"
 
@@ -63,7 +64,7 @@ void httpc(void *drawhdl)
 	draw(drawhdl, "HTTP client called");
 	esp_http_client_handle_t client = esp_http_client_init(
 		&(esp_http_client_config_t){
-			.url = "https://par.average.org/latest.txt",
+			.url = CONFIG_URL,
 			.event_handler = http_event_handler,
 			.user_data = &data,
 		}

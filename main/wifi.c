@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: CC0-1.0
  */
 
+#include <stdlib.h>
 #include <time.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
@@ -174,10 +175,12 @@ void init_wifi(void *drawhdl)
 		time_t now;
 		struct tm timeinfo;
 		char strftime_buf[64];
+		setenv("TZ", CONFIG_TZSPEC, true);
+		tzset();
 		time(&now);
-		gmtime_r(&now, &timeinfo);
+		localtime_r(&now, &timeinfo);
 		strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
-		ESP_LOGI(TAG, "Current time: %s GMT", strftime_buf);
+		ESP_LOGI(TAG, "Current time: %s", strftime_buf);
 	} else {
 		draw(drawhdl, "Failed to connect to the Internet");
 	}
