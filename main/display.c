@@ -1,9 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2021-2022 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: CC0-1.0
- */
-
 #include <esp_log.h>
 #include <lvgl.h>
 #include "display.h"
@@ -50,12 +44,14 @@ void make_label(lv_obj_t *scr, lv_obj_t **lblp, int valign, int height)
     lv_obj_set_style_text_color(lbl, c_swap(lv_color_make(255, 255, 255)),
 				LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl, LV_ALIGN_TOP_LEFT, LV_PART_MAIN);
+    lv_label_set_text(lbl, " ");
     *lblp = lbl;
 }
 
 void *init_display(lv_display_t *disp)
 {
     lv_obj_t *scr = lv_display_get_screen_active(disp);
+    lv_obj_clean(scr);
     make_label(scr, &panes.mainpane, LV_ALIGN_TOP_MID, 80);
     make_label(scr, &panes.statuspane, LV_ALIGN_BOTTOM_MID, 16);
     ESP_LOGI(TAG, "returning panes pointer %p", &panes);

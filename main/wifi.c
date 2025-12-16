@@ -79,9 +79,10 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(
 					&ap_num, ap_records));
 		for (int i = 0; i < ap_num; i++) {
-			ESP_LOGI(TAG, "AP %i: ssid %.33s, ch %i",
+			ESP_LOGI(TAG, "AP %i: ssid %.33s, ch %i, rssi %d",
 					i, ap_records[i].ssid,
-					ap_records[i].primary);
+					ap_records[i].primary,
+					ap_records[i].rssi);
 		}
 		free(ap_records);
 		ESP_ERROR_CHECK(esp_wifi_connect());  // select SSID here
@@ -175,7 +176,7 @@ void init_wifi(void *drawhdl)
 			HAVE_IPV4 | HAVE_IPV6 | WIFI_FAIL,
 			pdFALSE,
 			pdFALSE,
-			5000 / portTICK_PERIOD_MS);  // 1s
+			15000 / portTICK_PERIOD_MS);  // 15s
 
 	if (bits & HAVE_IPV4) {
 		ESP_LOGI(TAG, "connected with IPv4");
