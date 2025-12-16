@@ -55,14 +55,36 @@ static EventGroupHandle_t s_wifi_event_group;
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		int32_t event_id, void* event_data)
 {
+	uint16_t ap_num;
 	assert(event_base == WIFI_EVENT);
 
 	switch (event_id) {
 	case WIFI_EVENT_STA_START:
-		esp_wifi_connect();
+		ESP_ERROR_CHECK(esp_wifi_scan_start(&(wifi_scan_config_t){
+					.scan_type = WIFI_SCAN_TYPE_ACTIVE,
+				}, false));
 		break;
 	case WIFI_EVENT_STA_STOP:
 		ESP_LOGI(TAG, "Stopped");
+		break;
+	case WIFI_EVENT_SCAN_DONE:
+		ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_num));
+		ESP_LOGI(TAG, "Scan returned %hu records", ap_num);
+		wifi_ap_record_t *ap_records =
+			malloc(sizeof(wifi_ap_record_t) * ap_num);
+		if (!ap_records) {
+			ESP_LOGE(TAG, "Failed to allocate record results");
+			break;
+		}
+		ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(
+					&ap_num, ap_records));
+		for (int i = 0; i < ap_num; i++) {
+			ESP_LOGI(TAG, "AP %i: ssid %.33s, ch %i",
+					i, ap_records[i].ssid,
+					ap_records[i].primary);
+		}
+		free(ap_records);
+		ESP_ERROR_CHECK(esp_wifi_connect());  // select SSID here
 		break;
 	case WIFI_EVENT_STA_CONNECTED:
 		ESP_LOGI(TAG, "Connected");
@@ -141,7 +163,7 @@ void init_wifi(void *drawhdl)
 			IP_EVENT_GOT_IP6, &ip_event_handler, drawhdl));
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,
-		       	&(wifi_config_t){
+			&(wifi_config_t){
 				.sta = {
 					.ssid = WIFI_SSID,
 					.password = WPA_PASSWORD,
