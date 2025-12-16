@@ -20,7 +20,7 @@
 #include "wifi.h"
 #include "display.h"
 
-#define TAG "lvgl_esplcd"
+#define TAG "freshlist"
 
 #if defined(CONFIG_HWE_DISPLAY_SPI1_HOST)
 # define SPIx_HOST SPI1_HOST
@@ -62,6 +62,7 @@ static void disp_flush(lv_display_t *disp_drv, const lv_area_t *area,
 {
 	esp_lcd_panel_handle_t panel_handle =
 		(esp_lcd_panel_handle_t)lv_display_get_user_data(disp_drv);
+	lv_draw_sw_rgb565_swap(px_map, lv_area_get_size(area));
 	ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle,
 			area->x1, area->y1,
 			area->x2 + 1, area->y2 + 1,
@@ -185,9 +186,11 @@ static void gui_task(void *pvParameter)
 				.intr_type = GPIO_INTR_DISABLE,
 			}));
 
-	ESP_LOGI(TAG, "Display LVGL Scroll Text");
+	ESP_LOGI(TAG, "Init LVGL Display");
 	void *drawhdl = init_display(disp);
+	lv_task_handler();
 	init_wifi(drawhdl);
+
 	while (stop_request < 1) {
 		vTaskDelay(pdMS_TO_TICKS(10));
 		if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY)) {
@@ -195,10 +198,8 @@ static void gui_task(void *pvParameter)
 			xSemaphoreGive(xGuiSemaphore);
 		}
 		int lvl = gpio_get_level(CONFIG_HWE_BUTTON_1);
-		/*
-		ESP_LOGI(TAG, "stop request = %d, level = %d",
-				stop_request, lvl);
-		*/
+		// ESP_LOGI(TAG, "stop request = %d, level = %d",
+		//		stop_request, lvl);
 		if (!lvl) stop_request++;
 	}
 	ESP_LOGI(TAG, "Shutting down");

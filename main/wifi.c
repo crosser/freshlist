@@ -60,6 +60,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 
 	switch (event_id) {
 	case WIFI_EVENT_STA_START:
+		draw_status(arg, "Scanning...");
 		ESP_ERROR_CHECK(esp_wifi_scan_start(&(wifi_scan_config_t){
 					.scan_type = WIFI_SCAN_TYPE_ACTIVE,
 				}, false));
@@ -88,7 +89,13 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		ESP_ERROR_CHECK(esp_wifi_connect());  // select SSID here
 		break;
 	case WIFI_EVENT_STA_CONNECTED:
-		ESP_LOGI(TAG, "Connected");
+		wifi_event_sta_connected_t *conn =
+			(wifi_event_sta_connected_t *)event_data;
+		ESP_LOGI(TAG, "Connected %.*s", conn->ssid_len, conn->ssid);
+		char ssid_buf[33];
+		snprintf(ssid_buf, sizeof(ssid_buf),
+				"%.*s", conn->ssid_len, conn->ssid);
+		draw_status(arg, ssid_buf);
 		// Have to do this by hand for SLAAC to work!?
 		ESP_ERROR_CHECK(esp_netif_create_ip6_linklocal(wifi_netif));
 		ESP_ERROR_CHECK(dhcp6_enable_stateless(
@@ -115,12 +122,16 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 static void ip_event_handler(void* arg, esp_event_base_t event_base,
 		int32_t event_id, void* event_data)
 {
+	char ip_buf[40];
+
 	assert(event_base == IP_EVENT);
 	switch (event_id) {
 	case IP_EVENT_STA_GOT_IP:
 		ip_event_got_ip_t *event = (ip_event_got_ip_t*) event_data;
 		ESP_LOGI(TAG, "got ipv4:" IPSTR,
 				IP2STR(&event->ip_info.ip));
+		snprintf(ip_buf, sizeof(ip_buf),
+				IPSTR, IP2STR(&event->ip_info.ip));
 		xEventGroupSetBits(s_wifi_event_group, HAVE_IPV4);
 		break;
 	case IP_EVENT_GOT_IP6:
@@ -130,6 +141,8 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 		if (esp_netif_ip6_get_addr_type(&event6->ip6_info.ip)
 				== ESP_IP6_ADDR_IS_GLOBAL) {
 			ESP_LOGI(TAG, "It is global, can use!");
+			snprintf(ip_buf, sizeof(ip_buf), IPV6STR,
+					IPV62STR(event6->ip6_info.ip));
 			xEventGroupSetBits(s_wifi_event_group, HAVE_IPV6);
 		}
 		break;
@@ -207,7 +220,7 @@ void init_wifi(void *drawhdl)
 		ESP_LOGI(TAG, "Current time: %s", strftime_buf);
 		draw_status(drawhdl, strftime_buf);
 	} else {
-		draw_main(drawhdl, "Failed to connect to the Internet");
+		draw_status(drawhdl, "Failed to connect to the Internet");
 	}
 	retries = 0;
 	ESP_ERROR_CHECK(esp_wifi_disconnect());
