@@ -3,7 +3,20 @@
 // #include <esp_tls.h>
 #include "httpc.h"
 #include "display.h"
+
+#if defined __has_include
+#  if __has_include("../url.h")
+#    include "../url.h"
+#  endif
+#endif
+
 #include "sdkconfig.h"
+
+#ifdef LOCAL_URL
+#  define URL LOCAL_URL
+#else
+#  define URL CONFIG_URL
+#endif
 
 #define TAG "httpc"
 
@@ -61,10 +74,11 @@ void httpc(void *drawhdl)
 		.current = 0,
 	};
 
+	ESP_LOGI(TAG, "connecting to %s", URL);
 	draw(drawhdl, "HTTP client called");
 	esp_http_client_handle_t client = esp_http_client_init(
 		&(esp_http_client_config_t){
-			.url = CONFIG_URL,
+			.url = URL,
 			.event_handler = http_event_handler,
 			.user_data = &data,
 		}
