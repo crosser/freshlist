@@ -32,28 +32,34 @@ static lv_color_t c_swap(lv_color_t o)
     };
 }
 
-static lv_obj_t *label;
+static struct panes {
+	lv_obj_t *mainpane;
+	lv_obj_t *statuspane;
+} panes = {0};
+
+void make_label(lv_obj_t *scr, lv_obj_t **lblp, int valign, int height)
+{
+    lv_obj_t *lbl = lv_label_create(scr);
+    lv_obj_set_width(lbl, lv_pct(100));
+    lv_obj_set_height(lbl, lv_pct(height));
+    lv_obj_set_style_bg_color(scr, c_swap(lv_color_make(0, 0, 120)),
+				LV_PART_MAIN);
+    lv_obj_align(lbl, valign, 0, 0);
+
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_color(lbl, c_swap(lv_color_make(255, 255, 255)),
+				LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl, LV_ALIGN_TOP_LEFT, LV_PART_MAIN);
+    *lblp = lbl;
+}
 
 void *init_display(lv_display_t *disp)
 {
     lv_obj_t *scr = lv_display_get_screen_active(disp);
-    label = lv_label_create(scr);
-    lv_obj_set_width(label, lv_pct(96));
-    lv_obj_set_height(label, lv_pct(90));
-    lv_obj_set_style_bg_color(scr, c_swap(lv_color_make(0, 0, 120)),
-				LV_PART_MAIN);
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
-    lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-
-    lv_label_set_text(label, "Hello Espressif, Hello LVGL. "
-		      "This is an especially long text that is expected "
-		      "to scroll circularly");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_28, 0);
-    lv_obj_set_style_text_color(label, c_swap(lv_color_make(255, 255, 255)),
-				LV_PART_MAIN);
-    lv_obj_set_style_text_align(label, LV_ALIGN_TOP_LEFT, LV_PART_MAIN);
-    ESP_LOGI(TAG, "returning label pointer %p", label);
-    return (void *)label;
+    make_label(scr, &panes.mainpane, LV_ALIGN_TOP_MID, 80);
+    make_label(scr, &panes.statuspane, LV_ALIGN_BOTTOM_MID, 16);
+    ESP_LOGI(TAG, "returning panes pointer %p", &panes);
+    return (void *)&panes;
 }
 
 void stop_display(lv_display_t *disp)
@@ -61,9 +67,16 @@ void stop_display(lv_display_t *disp)
 	return;
 }
 
-void draw(void *hdl, char *msg)
+void draw_main(void *hdl, char *msg)
 {
-	lv_obj_t *lbl = (lv_obj_t *)hdl;
-	lv_obj_clean(label);
+	lv_obj_t *lbl = ((struct panes *)hdl)->mainpane;
+	lv_obj_clean(lbl);
+	lv_label_set_text(lbl, msg);
+}
+
+void draw_status(void *hdl, char *msg)
+{
+	lv_obj_t *lbl = ((struct panes *)hdl)->statuspane;
+	lv_obj_clean(lbl);
 	lv_label_set_text(lbl, msg);
 }

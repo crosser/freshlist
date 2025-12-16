@@ -201,10 +201,12 @@ void init_wifi(void *drawhdl)
 		tzset();
 		time(&now);
 		localtime_r(&now, &timeinfo);
-		strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+		strftime(strftime_buf, sizeof(strftime_buf),
+				"%c %z", &timeinfo);
 		ESP_LOGI(TAG, "Current time: %s", strftime_buf);
+		draw_status(drawhdl, strftime_buf);
 	} else {
-		draw(drawhdl, "Failed to connect to the Internet");
+		draw_main(drawhdl, "Failed to connect to the Internet");
 	}
 	retries = 0;
 	ESP_ERROR_CHECK(esp_wifi_disconnect());
