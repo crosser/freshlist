@@ -5,6 +5,7 @@
 static const char *TAG = "display";
 
 static struct panes {
+	SemaphoreHandle_t semaphore;
 	lv_obj_t *mainpane;
 	lv_obj_t *statuspane;
 } panes = {0};
@@ -26,10 +27,11 @@ void make_label(lv_obj_t *scr, lv_obj_t **lblp, int valign, int height)
     *lblp = lbl;
 }
 
-void *init_display(lv_display_t *disp)
+void *init_display(lv_display_t *disp, SemaphoreHandle_t xGuiSemaphore)
 {
     lv_obj_t *scr = lv_display_get_screen_active(disp);
     lv_obj_clean(scr);
+    panes.semaphore = xGuiSemaphore;
     make_label(scr, &panes.mainpane, LV_ALIGN_TOP_MID, 80);
     make_label(scr, &panes.statuspane, LV_ALIGN_BOTTOM_MID, 16);
     ESP_LOGI(TAG, "returning panes pointer %p", &panes);
@@ -43,14 +45,22 @@ void stop_display(lv_display_t *disp)
 
 void draw_main(void *hdl, char *msg)
 {
+	SemaphoreHandle_t semaphore = ((struct panes *)hdl)->semaphore;
 	lv_obj_t *lbl = ((struct panes *)hdl)->mainpane;
-	lv_obj_clean(lbl);
-	lv_label_set_text(lbl, msg);
+	if (pdTRUE == xSemaphoreTake(semaphore, portMAX_DELAY)) {
+		lv_obj_clean(lbl);
+		lv_label_set_text(lbl, msg);
+		xSemaphoreGive(semaphore);
+	}
 }
 
 void draw_status(void *hdl, char *msg)
 {
+	SemaphoreHandle_t semaphore = ((struct panes *)hdl)->semaphore;
 	lv_obj_t *lbl = ((struct panes *)hdl)->statuspane;
-	lv_obj_clean(lbl);
-	lv_label_set_text(lbl, msg);
+	if (pdTRUE == xSemaphoreTake(semaphore, portMAX_DELAY)) {
+		lv_obj_clean(lbl);
+		lv_label_set_text(lbl, msg);
+		xSemaphoreGive(semaphore);
+	}
 }

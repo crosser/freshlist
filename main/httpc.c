@@ -26,6 +26,8 @@ typedef struct {
 	char *buffer;
 	size_t capacity;
 	size_t current;
+	// Ugh!
+	void (*finish)(void);
 } data_t;
 
 static esp_err_t http_event_handler(esp_http_client_event_t *evt)
@@ -63,6 +65,7 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 		break;
 	case HTTP_EVENT_ON_FINISH:
 		ESP_LOGI(TAG, "Event HTTP_EVENT_ON_FINISH");
+		data->finish();
 		break;
 	case HTTP_EVENT_DISCONNECTED:
 		ESP_LOGI(TAG, "Event HTTP_EVENT_DISCONNECTED");
@@ -77,13 +80,14 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 	return ESP_OK;
 }
 
-void httpc(void *drawhdl)
+void httpc(void *drawhdl, void (*finish)(void))
 {
 	char buf[BUFFER_SIZE] = {0};
 	data_t data = {
 		.buffer = buf,
 		.capacity = BUFFER_SIZE - 1,
 		.current = 0,
+		.finish = finish,
 	};
 
 	ESP_LOGI(TAG, "connecting to %s", URL);

@@ -48,9 +48,48 @@ static const char *TAG = "wifi";
 #define HAVE_IPV6 BIT1
 #define WIFI_FAIL BIT2
 
+static bool need_conn_action;
 static int retries;
 static esp_netif_t *wifi_netif;
-static EventGroupHandle_t s_wifi_event_group;
+
+static void on_ready(void *drawhdl)
+{
+	if (need_conn_action) {
+		need_conn_action = false;
+		ESP_ERROR_CHECK(esp_netif_sntp_init(
+			&(esp_sntp_config_t)ESP_NETIF_SNTP_DEFAULT_CONFIG(
+				"pool.ntp.org"
+			)));
+	} else {
+		ESP_LOGI(TAG, "on_read action taken already");
+	}
+}
+
+static void finish(void)
+{
+	ESP_LOGI(TAG, "Disconnecting and stopping wifi");
+	retries = 0;
+	esp_netif_sntp_deinit();
+	ESP_ERROR_CHECK(esp_wifi_disconnect());
+}
+
+static void sntp_event_handler(void* arg, esp_event_base_t event_base,
+		int32_t event_id, void* event_data)
+{
+	time_t now;
+	struct tm timeinfo;
+	char strftime_buf[64];
+	assert(event_base == NETIF_SNTP_EVENT);
+	time(&now);
+	localtime_r(&now, &timeinfo);
+	strftime(strftime_buf, sizeof(strftime_buf),
+			"%c %z", &timeinfo);
+	ESP_LOGI(TAG, "Current time: %s", strftime_buf);
+	draw_status(arg, strftime_buf);
+	ESP_LOGI(TAG, "Running http client");
+	// httpc(arg, finish);
+	finish();
+}
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		int32_t event_id, void* event_data)
@@ -107,7 +146,10 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 			ESP_LOGI(TAG, "retries left: %d", retries);
 			esp_wifi_connect();
 		} else {
-			xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL);
+			ESP_LOGI(TAG, "disconnected from the ap");
+			draw_status(arg, "Disconnected from WiFi");
+			retries = 0;
+			ESP_ERROR_CHECK(esp_wifi_stop());
 		}
 		break;
 	case WIFI_EVENT_HOME_CHANNEL_CHANGE:
@@ -133,7 +175,7 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 		snprintf(ip_buf, sizeof(ip_buf),
 				IPSTR, IP2STR(&event->ip_info.ip));
 		draw_status(arg, ip_buf);
-		xEventGroupSetBits(s_wifi_event_group, HAVE_IPV4);
+		on_ready(arg);
 		break;
 	case IP_EVENT_GOT_IP6:
 		ip_event_got_ip6_t *event6 = (ip_event_got_ip6_t*) event_data;
@@ -145,7 +187,7 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 			snprintf(ip_buf, sizeof(ip_buf), IPV6STR,
 					IPV62STR(event6->ip6_info.ip));
 			draw_status(arg, ip_buf);
-			xEventGroupSetBits(s_wifi_event_group, HAVE_IPV6);
+			on_ready(arg);
 		}
 		break;
 	default:
@@ -165,7 +207,6 @@ void init_wifi(void *drawhdl)
 	ESP_ERROR_CHECK(ret);
 	ESP_LOGI(TAG, "Starting WiFi");
 	retries = 2;
-	s_wifi_event_group = xEventGroupCreate();
 
 	ESP_ERROR_CHECK(esp_netif_init());
 	wifi_netif = esp_netif_create_default_wifi_sta();
@@ -177,6 +218,8 @@ void init_wifi(void *drawhdl)
 			IP_EVENT_STA_GOT_IP, &ip_event_handler, drawhdl));
 	ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,
 			IP_EVENT_GOT_IP6, &ip_event_handler, drawhdl));
+	ESP_ERROR_CHECK(esp_event_handler_register(NETIF_SNTP_EVENT,
+			NETIF_SNTP_TIME_SYNC, &sntp_event_handler, drawhdl));
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,
 			&(wifi_config_t){
@@ -185,52 +228,15 @@ void init_wifi(void *drawhdl)
 					.password = WPA_PASSWORD,
 				},
 			}));
+	need_conn_action = true;
 	ESP_ERROR_CHECK(esp_wifi_start());
-	ESP_LOGI(TAG, "wifi_init_sta finished.");
-	EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-			HAVE_IPV4 | HAVE_IPV6 | WIFI_FAIL,
-			pdFALSE,
-			pdFALSE,
-			15000 / portTICK_PERIOD_MS);  // 15s
-
-	if (bits & HAVE_IPV4) {
-		ESP_LOGI(TAG, "connected with IPv4");
-	} else if (bits & HAVE_IPV6) {
-		ESP_LOGI(TAG, "connected with IPv6");
-	} else if (bits & WIFI_FAIL) {
-		ESP_LOGI(TAG, "Failed to connect to ap");
-	} else {
-		ESP_LOGE(TAG, "Timed out");
-	}
-	if (bits & (HAVE_IPV4 | HAVE_IPV6)) {
-		ESP_ERROR_CHECK(esp_netif_sntp_init(
-			&(esp_sntp_config_t)ESP_NETIF_SNTP_DEFAULT_CONFIG(
-				"pool.ntp.org"
-			)));
-		httpc(drawhdl);
-		ESP_ERROR_CHECK(esp_netif_sntp_sync_wait(
-					pdMS_TO_TICKS(5000)));
-		time_t now;
-		struct tm timeinfo;
-		char strftime_buf[64];
-		setenv("TZ", CONFIG_TZSPEC, true);
-		tzset();
-		time(&now);
-		localtime_r(&now, &timeinfo);
-		strftime(strftime_buf, sizeof(strftime_buf),
-				"%c %z", &timeinfo);
-		ESP_LOGI(TAG, "Current time: %s", strftime_buf);
-		draw_status(drawhdl, strftime_buf);
-	} else {
-		draw_status(drawhdl, "Failed to connect to the Internet");
-	}
-	retries = 0;
-	ESP_ERROR_CHECK(esp_wifi_disconnect());
-	ESP_ERROR_CHECK(esp_wifi_stop());
+	ESP_LOGI(TAG, "wifi_init_sta executed");
 }
 
 void stop_wifi(void)
 {
+	ESP_ERROR_CHECK(esp_event_handler_unregister(NETIF_SNTP_EVENT,
+				NETIF_SNTP_TIME_SYNC, &sntp_event_handler));
 	ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT,
 				IP_EVENT_GOT_IP6, &ip_event_handler));
 	ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT,
@@ -238,6 +244,5 @@ void stop_wifi(void)
 	ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT,
 				ESP_EVENT_ANY_ID, &wifi_event_handler));
 	ESP_ERROR_CHECK(esp_wifi_stop());
-	vEventGroupDelete(s_wifi_event_group);
 	ESP_LOGI(TAG, "WiFi stopped");
 }

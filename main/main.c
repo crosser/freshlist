@@ -1,5 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <driver/gpio.h>
@@ -187,8 +189,7 @@ static void gui_task(void *pvParameter)
 			}));
 
 	ESP_LOGI(TAG, "Init LVGL Display");
-	void *drawhdl = init_display(disp);
-	lv_task_handler();
+	void *drawhdl = init_display(disp, xGuiSemaphore);
 	init_wifi(drawhdl);
 
 	while (stop_request < 1) {
@@ -214,6 +215,8 @@ static void gui_task(void *pvParameter)
 
 void app_main(void)
 {
+	setenv("TZ", CONFIG_TZSPEC, true);
+	tzset();
 	ESP_LOGI(TAG, "Launching gui task");
 	/* Pinned to core 1. Core 0 will run bluetooth/wifi jobs. */
 	xTaskCreatePinnedToCore(gui_task, "gui", 4096*2, NULL, 0, NULL, 1);
