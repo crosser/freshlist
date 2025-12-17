@@ -132,6 +132,7 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 				IP2STR(&event->ip_info.ip));
 		snprintf(ip_buf, sizeof(ip_buf),
 				IPSTR, IP2STR(&event->ip_info.ip));
+		draw_status(arg, ip_buf);
 		xEventGroupSetBits(s_wifi_event_group, HAVE_IPV4);
 		break;
 	case IP_EVENT_GOT_IP6:
@@ -143,6 +144,7 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 			ESP_LOGI(TAG, "It is global, can use!");
 			snprintf(ip_buf, sizeof(ip_buf), IPV6STR,
 					IPV62STR(event6->ip6_info.ip));
+			draw_status(arg, ip_buf);
 			xEventGroupSetBits(s_wifi_event_group, HAVE_IPV6);
 		}
 		break;
