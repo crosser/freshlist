@@ -29,7 +29,7 @@ static LV_STYLE_CONST_INIT(main_pfx_style,
 		LV_STYLE_CONST_PAD_LEFT(2),
 		LV_STYLE_CONST_PAD_RIGHT(2),
 		LV_STYLE_CONST_HEIGHT(34),
-		LV_STYLE_CONST_WIDTH(107),
+		LV_STYLE_CONST_WIDTH(106),
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(0, 64, 0)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
 		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
@@ -44,7 +44,7 @@ static LV_STYLE_CONST_INIT(main_msg_style,
 		LV_STYLE_CONST_PAD_LEFT(2),
 		LV_STYLE_CONST_PAD_RIGHT(2),
 		LV_STYLE_CONST_HEIGHT(34),
-		LV_STYLE_CONST_WIDTH(536),
+		LV_STYLE_CONST_WIDTH(428),
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(0, 0, 64)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
 		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
@@ -59,7 +59,7 @@ static LV_STYLE_CONST_INIT(status_style,
 		LV_STYLE_CONST_PAD_LEFT(2),
 		LV_STYLE_CONST_PAD_RIGHT(2),
 		LV_STYLE_CONST_HEIGHT(34),
-		LV_STYLE_CONST_WIDTH(536),
+		LV_STYLE_CONST_WIDTH(536),  // 536 - 2*2
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(64, 64, 64)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
 		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
@@ -84,20 +84,22 @@ void *init_display(lv_display_t *disp, SemaphoreHandle_t xGuiSemaphore)
 	} else {
 		lv_obj_align(obj, LV_ALIGN_TOP_LEFT, 0, 0);
 	}
-	lv_label_set_text_static(obj, "pfx");
+	lv_label_set_text_static(obj, " ");
 	panes.main[i].pfx = obj;
 
 	obj = lv_label_create(scr);
 	lv_obj_add_style(obj, &main_msg_style, LV_PART_MAIN);
 	lv_obj_align_to(obj, panes.main[i].pfx,
-				LV_ALIGN_OUT_RIGHT_MID, 0, 0);
-	lv_label_set_text_static(obj, "msg");
+				LV_ALIGN_OUT_RIGHT_MID, 2, 0);
+	lv_label_set_long_mode(obj, LV_LABEL_LONG_SCROLL_CIRCULAR);
+	lv_label_set_text_static(obj, " ");
 	panes.main[i].msg = obj;
     }
     obj = lv_label_create(scr);
     lv_obj_add_style(obj, &status_style, LV_PART_MAIN);
     lv_obj_align(obj, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_label_set_long_mode(obj, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_label_set_text_static(obj, " ");
     panes.status = obj;
     return (void *)&panes;
 }
