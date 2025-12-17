@@ -16,6 +16,12 @@ static struct panes {
 	lv_obj_t *status;
 } panes = {0};
 
+static LV_STYLE_CONST_INIT(screen_style,
+	((static lv_style_const_prop_t []){
+		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(0, 0, 0)),
+		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
+	}));
+
 static LV_STYLE_CONST_INIT(main_pfx_style,
 	((static lv_style_const_prop_t []){
 		LV_STYLE_CONST_PAD_TOP(2),
@@ -65,6 +71,7 @@ void *init_display(lv_display_t *disp, SemaphoreHandle_t xGuiSemaphore)
 {
     lv_obj_t *scr = lv_display_get_screen_active(disp);
     lv_obj_t *obj;
+    lv_obj_add_style(scr, &screen_style, LV_PART_MAIN);
     lv_obj_clean(scr);
     panes.semaphore = xGuiSemaphore;
 
@@ -90,6 +97,7 @@ void *init_display(lv_display_t *disp, SemaphoreHandle_t xGuiSemaphore)
     obj = lv_label_create(scr);
     lv_obj_add_style(obj, &status_style, LV_PART_MAIN);
     lv_obj_align(obj, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_label_set_long_mode(obj, LV_LABEL_LONG_SCROLL_CIRCULAR);
     panes.status = obj;
     return (void *)&panes;
 }

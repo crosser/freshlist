@@ -123,6 +123,14 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 					i, ap_records[i].ssid,
 					ap_records[i].primary,
 					ap_records[i].rssi);
+			char s_rssi[10];
+			snprintf(s_rssi, sizeof(s_rssi), "%02u %02d",
+					ap_records[i].primary,
+					ap_records[i].rssi);
+			char s_ssid[34];
+			snprintf(s_ssid, sizeof(s_ssid), "%.33s",
+					ap_records[i].ssid);
+			draw_main(arg, i, s_rssi, s_ssid);
 		}
 		free(ap_records);
 		ESP_ERROR_CHECK(esp_wifi_connect());  // select SSID here
@@ -147,7 +155,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 			esp_wifi_connect();
 		} else {
 			ESP_LOGI(TAG, "disconnected from the ap");
-			draw_status(arg, "Disconnected from WiFi");
 			retries = 0;
 			ESP_ERROR_CHECK(esp_wifi_stop());
 		}
