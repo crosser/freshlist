@@ -91,7 +91,7 @@ void httpc(void *drawhdl, void (*finish)(void))
 	};
 
 	ESP_LOGI(TAG, "connecting to %s", URL);
-	draw_main(drawhdl, "HTTP client called");
+	draw_status(drawhdl, "HTTP client called");
 	esp_http_client_handle_t client = esp_http_client_init(
 		&(esp_http_client_config_t){
 			.url = URL,
@@ -106,11 +106,11 @@ void httpc(void *drawhdl, void (*finish)(void))
 				esp_http_client_get_status_code(client),
 				esp_http_client_get_content_length(client));
 		ESP_LOGD(TAG, "got \"%s\"", buf);
-		draw_main(drawhdl, buf);
+		// draw_main(drawhdl, buf);
 	} else {
 		ESP_LOGE(TAG, "HTTP GET request failed: %s",
 				esp_err_to_name(err));
-		draw_main(drawhdl, (char *)esp_err_to_name(err));
+		draw_status(drawhdl, (char *)esp_err_to_name(err));
 	}
 
 	esp_http_client_cleanup(client);
