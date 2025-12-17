@@ -45,6 +45,9 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 	case HTTP_EVENT_ON_HEADERS_COMPLETE:
 		ESP_LOGI(TAG, "Event HTTP_EVENT_ON_HEADERS_COMPLETE");
 		break;
+	case HTTP_EVENT_ON_STATUS_CODE:
+		ESP_LOGI(TAG, "Event HTTP_EVENT_ON_STATUS_CODE");
+		break;
 	case HTTP_EVENT_ON_DATA:
 		ESP_LOGI(TAG, "Data len=%d", evt->data_len);
 		if (data->current + evt->data_len < data->capacity) {
@@ -57,6 +60,15 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 					data->capacity);
 		}
 		ESP_LOGI(TAG, "Data \"%.*s\"", evt->data_len, evt->data);
+		break;
+	case HTTP_EVENT_ON_FINISH:
+		ESP_LOGI(TAG, "Event HTTP_EVENT_ON_FINISH");
+		break;
+	case HTTP_EVENT_DISCONNECTED:
+		ESP_LOGI(TAG, "Event HTTP_EVENT_DISCONNECTED");
+		break;
+	case HTTP_EVENT_REDIRECT:
+		ESP_LOGI(TAG, "Event HTTP_EVENT_REDIRECT");
 		break;
 	default:
 		ESP_LOGI(TAG, "Event %d", evt->event_id);
