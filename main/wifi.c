@@ -88,8 +88,7 @@ static void sntp_event_handler(void* arg, esp_event_base_t event_base,
 	ESP_LOGI(TAG, "Current time: %s", strftime_buf);
 	draw_status(arg, strftime_buf);
 	ESP_LOGI(TAG, "Running http client");
-	// httpc(arg, finish);
-	finish();
+	httpc(arg, finish);
 }
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,

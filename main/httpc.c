@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <esp_log.h>
 #include <esp_http_client.h>
 // #include <esp_tls.h>
@@ -26,9 +28,9 @@ typedef struct {
 	char *buffer;
 	size_t capacity;
 	size_t current;
-	// Ugh!
-	void (*finish)(void);
 } data_t;
+
+static void (*finish)(void);
 
 static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 {
@@ -65,7 +67,6 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 		break;
 	case HTTP_EVENT_ON_FINISH:
 		ESP_LOGI(TAG, "Event HTTP_EVENT_ON_FINISH");
-		data->finish();
 		break;
 	case HTTP_EVENT_DISCONNECTED:
 		ESP_LOGI(TAG, "Event HTTP_EVENT_DISCONNECTED");
@@ -80,18 +81,16 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 	return ESP_OK;
 }
 
-void httpc(void *drawhdl, void (*finish)(void))
+static void httpc_run(void *drawhdl)
 {
 	char buf[BUFFER_SIZE] = {0};
 	data_t data = {
 		.buffer = buf,
 		.capacity = BUFFER_SIZE - 1,
 		.current = 0,
-		.finish = finish,
 	};
 
 	ESP_LOGI(TAG, "connecting to %s", URL);
-	draw_status(drawhdl, "HTTP client called");
 	esp_http_client_handle_t client = esp_http_client_init(
 		&(esp_http_client_config_t){
 			.url = URL,
@@ -114,4 +113,15 @@ void httpc(void *drawhdl, void (*finish)(void))
 	}
 
 	esp_http_client_cleanup(client);
+	ESP_LOGI(TAG, "Httpc task did the deed and is about to finish");
+	finish();
+	vTaskDelete(NULL);
+}
+
+void httpc(void *drawhdl, void (*finp)(void))
+{
+	finish = finp;
+	TaskHandle_t http_task;
+	xTaskCreate(httpc_run, "httpc_task", 4096*2, drawhdl, 0, &http_task);
+	ESP_LOGI(TAG, "Httpc task launched");
 }
