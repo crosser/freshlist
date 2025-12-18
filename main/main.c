@@ -15,7 +15,6 @@
 #include <esp_log.h>
 #include <esp_sleep.h>
 #include <esp_timer.h>
-#include <esp_event.h>
 #include <lvgl.h>
 #include "esp_lcd_panel_rm67162.h"
 #include "sdkconfig.h"
@@ -23,6 +22,9 @@
 #include "display.h"
 
 #define TAG "freshlist"
+
+// Refresh period in microseconds
+#define REFRESH_TIME (30 * 1000000)
 
 #if defined(CONFIG_HWE_DISPLAY_SPI1_HOST)
 # define SPIx_HOST SPI1_HOST
@@ -45,8 +47,6 @@
 
 #define LV_TICK_PERIOD_MS 1
 
-static volatile int stop_request = 0;
-
 static bool IRAM_ATTR color_trans_done(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t *edata, void *user_ctx)
 {
 	lv_display_t *disp = (lv_display_t*)user_ctx;
@@ -55,8 +55,15 @@ static bool IRAM_ATTR color_trans_done(esp_lcd_panel_io_handle_t panel_io, esp_l
 	return false; 
 }
 
-static void lv_tick_task(void *arg) {
+static void lv_tick_task(void *arg)
+{
 	lv_tick_inc(LV_TICK_PERIOD_MS);
+}
+
+static void fetch_timer_task(void *arg)
+{
+	ESP_LOGI(TAG, "Periodic fetch task initiated");
+	start_wifi();
 }
 
 static void disp_flush(lv_display_t *disp_drv, const lv_area_t *area,
@@ -75,7 +82,6 @@ SemaphoreHandle_t xGuiSemaphore;
 
 static void gui_task(void *pvParameter)
 {
-	ESP_ERROR_CHECK(esp_event_loop_create_default());
 	xGuiSemaphore = xSemaphoreCreateMutex();
 	ESP_LOGI(TAG, "Power up AMOLED");
 	ESP_ERROR_CHECK(gpio_set_direction(CONFIG_HWE_DISPLAY_PWR,
@@ -191,8 +197,20 @@ static void gui_task(void *pvParameter)
 	ESP_LOGI(TAG, "Init LVGL Display");
 	void *drawhdl = init_display(disp, xGuiSemaphore);
 	init_wifi(drawhdl);
+	start_wifi();
 
-	while (stop_request < 1) {
+	esp_timer_handle_t fetch_timer;
+	ESP_ERROR_CHECK(esp_timer_create(
+		&(esp_timer_create_args_t) {
+			.callback = fetch_timer_task,
+			.name = "periodic fetch",
+		},
+		&fetch_timer));
+	ESP_ERROR_CHECK(esp_timer_start_periodic(fetch_timer, REFRESH_TIME));
+
+	int oldlvl = 1;
+	int stop_request = 0;
+	while (stop_request < 100) {
 		vTaskDelay(pdMS_TO_TICKS(10));
 		if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY)) {
 			lv_task_handler();
@@ -201,16 +219,19 @@ static void gui_task(void *pvParameter)
 		int lvl = gpio_get_level(CONFIG_HWE_BUTTON_1);
 		// ESP_LOGI(TAG, "stop request = %d, level = %d",
 		//		stop_request, lvl);
-		if (!lvl) stop_request++;
+		if (lvl) stop_request = 0;
+		else stop_request++;
+		if (lvl && !oldlvl) start_wifi();
+		oldlvl = lvl;
 	}
 	ESP_LOGI(TAG, "Shutting down");
-	stop_wifi();
+	ESP_ERROR_CHECK(esp_timer_stop(fetch_timer));
+	deinit_wifi();
 	stop_display(disp);
 	lv_task_handler();
 	ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, false));
 	ESP_ERROR_CHECK(gpio_set_level(CONFIG_HWE_DISPLAY_PWR,
 				!CONFIG_HWE_DISPLAY_PWR_ON_LEVEL));
-	ESP_ERROR_CHECK(esp_event_loop_delete_default());
 	esp_deep_sleep_start();
 }
 

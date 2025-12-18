@@ -2,6 +2,7 @@
 #define _WIFI_H
 
 void init_wifi(void *drawhdl);
-void stop_wifi(void);
+void start_wifi(void);
+void deinit_wifi(void);
 
 #endif

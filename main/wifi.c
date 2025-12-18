@@ -52,6 +52,7 @@ static const char *TAG = "WiFi";
 static bool need_conn_action;
 static int retries;
 static esp_netif_t *wifi_netif;
+static bool running = false;
 
 static void on_ready(void *drawhdl)
 {
@@ -106,6 +107,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		break;
 	case WIFI_EVENT_STA_STOP:
 		ESP_LOGI(TAG, "Stopped");
+		running = false;
 		break;
 	case WIFI_EVENT_SCAN_DONE:
 		ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_num));
@@ -237,6 +239,8 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 
 void init_wifi(void *drawhdl)
 {
+	running = false;
+	ESP_ERROR_CHECK(esp_event_loop_create_default());
 	esp_err_t ret = nvs_flash_init();
 	if (ret == ESP_ERR_NVS_NO_FREE_PAGES
 		|| ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -260,11 +264,21 @@ void init_wifi(void *drawhdl)
 	ESP_ERROR_CHECK(esp_event_handler_register(NETIF_SNTP_EVENT,
 			NETIF_SNTP_TIME_SYNC, &sntp_event_handler, drawhdl));
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-	ESP_ERROR_CHECK(esp_wifi_start());
-	ESP_LOGI(TAG, "wifi_init_sta executed");
+	ESP_LOGI(TAG, "handlers installed and mode set to STA");
 }
 
-void stop_wifi(void)
+void start_wifi(void)
+{
+	if (running) {
+		ESP_LOGI(TAG, "start ignored, already running");
+		return;
+	}
+	running = true;
+	ESP_ERROR_CHECK(esp_wifi_start());
+	ESP_LOGI(TAG, "cycle started");
+}
+
+void deinit_wifi(void)
 {
 	ESP_ERROR_CHECK(esp_event_handler_unregister(NETIF_SNTP_EVENT,
 				NETIF_SNTP_TIME_SYNC, &sntp_event_handler));
@@ -274,6 +288,6 @@ void stop_wifi(void)
 				IP_EVENT_STA_GOT_IP, &ip_event_handler));
 	ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT,
 				ESP_EVENT_ANY_ID, &wifi_event_handler));
-	ESP_ERROR_CHECK(esp_wifi_stop());
-	ESP_LOGI(TAG, "WiFi stopped");
+	ESP_ERROR_CHECK(esp_event_loop_delete_default());
+	ESP_LOGI(TAG, "handlers removed");
 }
