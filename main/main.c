@@ -206,6 +206,7 @@ static void gui_task(void *pvParameter)
 	ESP_LOGI(TAG, "Shutting down");
 	stop_wifi();
 	stop_display(disp);
+	lv_task_handler();
 	ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, false));
 	ESP_ERROR_CHECK(gpio_set_level(CONFIG_HWE_DISPLAY_PWR,
 				!CONFIG_HWE_DISPLAY_PWR_ON_LEVEL));

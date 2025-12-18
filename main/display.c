@@ -106,7 +106,8 @@ void *init_display(lv_display_t *disp, SemaphoreHandle_t xGuiSemaphore)
 
 void stop_display(lv_display_t *disp)
 {
-	return;
+    lv_obj_t *scr = lv_display_get_screen_active(disp);
+    lv_obj_clean(scr);
 }
 
 void draw_main(void *hdl, int row, char *prefix, char *msg)
