@@ -22,27 +22,28 @@
 #include "display.h"
 #include "httpc.h"
 
+struct wifi_creds {
+        char *ssid;
+	char *password;
+};
+
 #if defined __has_include
 #  if __has_include("../credentials.h")
 #    include "../credentials.h"
+#    define WIFI_CREDS_DEFINED
 #  endif
 #endif
 
 #include "sdkconfig.h"
 
-#ifdef LOCAL_WIFI_SSID
-#  define WIFI_SSID LOCAL_WIFI_SSID
-#else
-#  define WIFI_SSID CONFIG_WIFI_SSID
+#ifndef WIFI_CREDS_DEFINED
+static struct wifi_creds wifi_creds[] = {
+	{ .ssid = CONFIG_WIFI_SSID, .password = CONFIG_WPA_PASSWORD },
+	{ NULL, NULL }
+};
 #endif
 
-#ifdef LOCAL_WPA_PASSWORD
-#  define WPA_PASSWORD LOCAL_WPA_PASSWORD
-#else
-#  define WPA_PASSWORD CONFIG_WPA_PASSWORD
-#endif
-
-static const char *TAG = "wifi";
+static const char *TAG = "WiFi";
 
 #define HAVE_IPV4 BIT0
 #define HAVE_IPV6 BIT1
@@ -113,11 +114,17 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		wifi_ap_record_t *ap_records =
 			malloc(sizeof(wifi_ap_record_t) * ap_num);
 		if (!ap_records) {
-			ESP_LOGE(TAG, "Failed to allocate record results");
+			ESP_LOGE(TAG, "Failed to allocate scan results");
+			draw_status(arg, "Failed to allocate scan results");
+			// Mere presense of this even if not executed
+			// corrupts video memory
+			//ESP_ERROR_CHECK(esp_wifi_clear_ap_list());
+			finish();
 			break;
 		}
 		ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(
 					&ap_num, ap_records));
+		int cred_id = -1;
 		for (int i = 0; i < ap_num; i++) {
 			ESP_LOGI(TAG, "AP %i: ssid %.33s, ch %i, rssi %d",
 					i, ap_records[i].ssid,
@@ -131,9 +138,35 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 			snprintf(s_ssid, sizeof(s_ssid), "%.33s",
 					ap_records[i].ssid);
 			draw_main(arg, i, s_rssi, s_ssid);
+			if (cred_id < 0) {
+				for (int j = 0; wifi_creds[j].ssid; j++) {
+					if (!strncmp(
+						(char *)ap_records[i].ssid,
+						wifi_creds[j].ssid,
+						33)) {
+						cred_id = j;
+						break;
+					}
+				}
+			}
 		}
 		free(ap_records);
-		ESP_ERROR_CHECK(esp_wifi_connect());  // select SSID here
+		if (cred_id < 0) {
+			ESP_LOGI(TAG, "Did not find matching credentials");
+			draw_status(arg, "Did not find matching credentials");
+			finish();
+			break;
+		}
+		ESP_LOGI(TAG, "Found known AP \"%s\", connecting",
+				wifi_creds[cred_id].ssid);
+		wifi_config_t config = {};
+		strncpy((char *)config.sta.ssid,
+				wifi_creds[cred_id].ssid, 32);
+		strncpy((char *)config.sta.password,
+				wifi_creds[cred_id].password, 64);
+		ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &config));
+		need_conn_action = true;
+		ESP_ERROR_CHECK(esp_wifi_connect());
 		break;
 	case WIFI_EVENT_STA_CONNECTED:
 		wifi_event_sta_connected_t *conn =
@@ -228,14 +261,6 @@ void init_wifi(void *drawhdl)
 	ESP_ERROR_CHECK(esp_event_handler_register(NETIF_SNTP_EVENT,
 			NETIF_SNTP_TIME_SYNC, &sntp_event_handler, drawhdl));
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,
-			&(wifi_config_t){
-				.sta = {
-					.ssid = WIFI_SSID,
-					.password = WPA_PASSWORD,
-				},
-			}));
-	need_conn_action = true;
 	ESP_ERROR_CHECK(esp_wifi_start());
 	ESP_LOGI(TAG, "wifi_init_sta executed");
 }
