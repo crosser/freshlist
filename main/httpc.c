@@ -33,14 +33,45 @@ typedef struct {
 
 static void (*finish)(void);
 
+static void process_line(int n, char *l)
+{
+	char *r, *w, *f = l;
+	bool in, quote = false;
+	int i = 0;
+	char *e[2] = {};
+
+	ESP_LOGI(TAG, "Line %d: %s", n, l);
+	for (r=l, w=l, in=false; *r; r++) {
+		switch (*r) {
+		case '"':
+			if (quote) *(w++) = *r;
+			quote = in;
+			in = !in;
+			break;
+		case ',':
+			quote = false;
+			if (!in) {
+				*(w++) = '\0';
+				if (i < 2) e[i++] = f;
+				else ESP_LOGE(TAG, "csv %d: %s", i, f);
+				f = w;
+			}
+			break;
+		default:
+			quote = false;
+			*(w++) = *r;
+			break;
+		}
+	}
+	*w = '\0';
+	if (i < 2) e[i++] = f;
+	else ESP_LOGE(TAG, "csv %d: %s", i, f);
+	ESP_LOGI(TAG, "%d: pfx=%s, msg=%s", n, e[0], e[1]);
+}
+
 static inline bool eol(char c)
 {
 	return (c == '\n' || c == '\r');
-}
-
-static void process_line(int n, char *l)
-{
-	ESP_LOGI(TAG, "%d: %s", n, l);
 }
 
 static void process_data(data_ctx_t *data_ctx, size_t len, char *chunk)
