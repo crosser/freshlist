@@ -69,7 +69,7 @@ static void on_ready(void *drawhdl)
 
 static void finish(void)
 {
-	ESP_LOGI(TAG, "Disconnecting and stopping wifi");
+	ESP_LOGI(TAG, "Disconnecting wifi");
 	retries = 0;
 	esp_netif_sntp_deinit();
 	ESP_ERROR_CHECK(esp_wifi_disconnect());
@@ -78,16 +78,7 @@ static void finish(void)
 static void sntp_event_handler(void* arg, esp_event_base_t event_base,
 		int32_t event_id, void* event_data)
 {
-	time_t now;
-	struct tm timeinfo;
-	char strftime_buf[64];
 	assert(event_base == NETIF_SNTP_EVENT);
-	time(&now);
-	localtime_r(&now, &timeinfo);
-	strftime(strftime_buf, sizeof(strftime_buf),
-			"%c %z", &timeinfo);
-	ESP_LOGI(TAG, "Current time: %s", strftime_buf);
-	draw_status(arg, strftime_buf);
 	ESP_LOGI(TAG, "Running http client");
 	httpc(arg, finish);
 }
@@ -106,7 +97,15 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 				}, false));
 		break;
 	case WIFI_EVENT_STA_STOP:
-		ESP_LOGI(TAG, "Stopped");
+		time_t now;
+		struct tm timeinfo;
+		char strftime_buf[64];
+		time(&now);
+		localtime_r(&now, &timeinfo);
+		strftime(strftime_buf, sizeof(strftime_buf),
+				"%c %z", &timeinfo);
+		ESP_LOGI(TAG, "Stopped at %s", strftime_buf);
+		draw_status(arg, strftime_buf);
 		running = false;
 		break;
 	case WIFI_EVENT_SCAN_DONE:
@@ -185,11 +184,11 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 	case WIFI_EVENT_STA_DISCONNECTED:
 		ESP_LOGI(TAG, "Disconnected");
 		if (retries-- > 0) {
-			ESP_LOGI(TAG, "retries left: %d", retries);
+			ESP_LOGI(TAG, "Disconnected, retries left: %d",
+					retries);
 			esp_wifi_connect();
 		} else {
-			ESP_LOGI(TAG, "disconnected from the ap");
-			retries = 0;
+			ESP_LOGI(TAG, "Disconnected, stopping");
 			ESP_ERROR_CHECK(esp_wifi_stop());
 		}
 		break;
