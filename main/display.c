@@ -5,14 +5,12 @@
 
 static const char *TAG = "display";
 
-#define ROWS 6
-
 static struct panes {
 	SemaphoreHandle_t semaphore;
 	struct {
 		lv_obj_t *pfx;
 		lv_obj_t *msg;
-	} main[ROWS];
+	} main[DISPLAY_ROWS];
 	lv_obj_t *status;
 } panes = {0};
 
@@ -29,7 +27,7 @@ static LV_STYLE_CONST_INIT(main_pfx_style,
 		LV_STYLE_CONST_PAD_LEFT(2),
 		LV_STYLE_CONST_PAD_RIGHT(2),
 		LV_STYLE_CONST_HEIGHT(34),
-		LV_STYLE_CONST_WIDTH(106),
+		LV_STYLE_CONST_WIDTH(116),
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(0, 64, 0)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
 		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
@@ -44,7 +42,7 @@ static LV_STYLE_CONST_INIT(main_msg_style,
 		LV_STYLE_CONST_PAD_LEFT(2),
 		LV_STYLE_CONST_PAD_RIGHT(2),
 		LV_STYLE_CONST_HEIGHT(34),
-		LV_STYLE_CONST_WIDTH(428),
+		LV_STYLE_CONST_WIDTH(418),
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(0, 0, 64)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
 		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
@@ -75,7 +73,7 @@ void *init_display(lv_display_t *disp, SemaphoreHandle_t xGuiSemaphore)
     lv_obj_clean(scr);
     panes.semaphore = xGuiSemaphore;
 
-    for (int i = 0; i < ROWS; i++) {
+    for (int i = 0; i < DISPLAY_ROWS; i++) {
 	obj = lv_label_create(scr);
 	lv_obj_add_style(obj, &main_pfx_style, LV_PART_MAIN);
 	if (i) {
@@ -112,9 +110,9 @@ void stop_display(lv_display_t *disp)
 
 void draw_main(void *hdl, int row, char *prefix, char *msg)
 {
-	if (row >= ROWS) {
+	if (row >= DISPLAY_ROWS) {
 		ESP_LOGI(TAG, "draw row number %d is too big: ceiling %d",
-				row, ROWS);
+				row, DISPLAY_ROWS);
 		return;
 	}
 	SemaphoreHandle_t semaphore = ((struct panes *)hdl)->semaphore;

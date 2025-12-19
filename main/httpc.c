@@ -31,6 +31,7 @@ typedef struct {
 	size_t current;
 } data_ctx_t;
 
+static void *drawhdl;
 static void (*finish)(void);
 
 static void process_line(int n, char *l)
@@ -67,6 +68,11 @@ static void process_line(int n, char *l)
 	if (i < 2) e[i++] = f;
 	else ESP_LOGE(TAG, "csv %d: %s", i, f);
 	ESP_LOGI(TAG, "%d: pfx=%s, msg=%s", n, e[0], e[1]);
+	struct tm when = {};
+	strptime(e[0], "%a %b %d %T %Y", &when);
+	char tbuf[32] = {};
+	strftime(tbuf, sizeof(tbuf), "%d %H:%M", &when);
+	draw_main(drawhdl, n, tbuf, e[1]);
 }
 
 static inline bool eol(char c)
@@ -204,6 +210,9 @@ static void httpc_run(void *drawhdl)
 		ESP_LOGI(TAG, "HTTP GET Status = %d, content_length = %"PRId64,
 				esp_http_client_get_status_code(client),
 				esp_http_client_get_content_length(client));
+		for (int i = data_ctx.index; i < DISPLAY_ROWS; i++) {
+			draw_main(drawhdl, i, "", "");
+		}
 	} else {
 		ESP_LOGE(TAG, "HTTP GET request failed: %s",
 				esp_err_to_name(err));
@@ -216,8 +225,9 @@ static void httpc_run(void *drawhdl)
 	vTaskDelete(NULL);
 }
 
-void httpc(void *drawhdl, void (*finp)(void))
+void httpc(void *drawp, void (*finp)(void))
 {
+	drawhdl = drawp;
 	finish = finp;
 	TaskHandle_t http_task;
 	xTaskCreate(httpc_run, "httpc_task", 4096*2, drawhdl, 0, &http_task);
