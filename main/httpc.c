@@ -22,19 +22,92 @@
 
 #define TAG "httpc"
 
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 256
 
 typedef struct {
+	int index;
 	char *buffer;
 	size_t capacity;
 	size_t current;
-} data_t;
+} data_ctx_t;
 
 static void (*finish)(void);
 
+static inline bool eol(char c)
+{
+	return (c == '\n' || c == '\r');
+}
+
+static void process_line(int n, char *l)
+{
+	ESP_LOGI(TAG, "%d: %s", n, l);
+}
+
+static void process_data(data_ctx_t *data_ctx, size_t len, char *chunk)
+{
+	char *b = chunk, *e = chunk + len;
+	char *ln;
+	size_t sz;
+	bool got_nl;
+
+	do {
+		for (e = b; e < chunk + len && !eol(*e); e++) /* nothing */ ;
+		// now e points to the character beyond the end of the line
+		got_nl = (e < chunk + len);  // Not ran into the end yet
+		sz = e - b;
+		while (e < chunk + len && eol(*e)) *(e++) = '\0';
+		ESP_LOGI(TAG,
+			"Slice b=%p, e=%p, end=%p, got_nl=%d, size=%d: %s",
+			b, e, chunk + len, got_nl, sz, b?b:"NULL");
+		// Now b points to a null-terminated line. Do we gave leftover?
+		if (data_ctx->current) {
+			ln = data_ctx->buffer;
+			if (len) {  // Got anything at all or is is fin?
+				if (data_ctx->current + sz
+						> data_ctx->capacity) {
+					ESP_LOGE(TAG, "Too much data %d", sz);
+					memcpy(ln, b, data_ctx->capacity
+							- data_ctx->current);
+					data_ctx->current = data_ctx->capacity;
+				} else {
+					memcpy(data_ctx->buffer
+						+ data_ctx->current + sz,
+						b, sz);
+					data_ctx->current += sz;
+				}
+			}
+			// We have reserved an extra byte there
+			ln[data_ctx->current] = '\0';
+		} else {
+			ln = b;
+		}
+		// Now we have a nul-terminated line `ln`. If it was newline
+		// terminated, _or_ came with len == 0 (EVENT_FINISHED),
+		// pass it to the function. Otherwise save in the data_ctx.
+		if (got_nl || !len) {
+			if (ln) {  // FIN could happen with empty save-data
+				process_line(data_ctx->index++, ln);
+			}
+			data_ctx->current = 0;
+		} else {  // Don't call process_line, but save it
+			if (sz > data_ctx->capacity) {
+				ESP_LOGE(TAG, "line longer than buffer %d",
+						sz);
+				memcpy(data_ctx->buffer, b,
+						data_ctx->capacity);
+				data_ctx->current = data_ctx->capacity;
+			} else {
+				memcpy(data_ctx->buffer, b, sz);
+				data_ctx->current = sz;
+			}
+		}
+		b = e;
+	} while (b < chunk + len);
+}
+
 static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 {
-	data_t *data = (data_t *)evt->user_data;
+	data_ctx_t *data_ctx = (data_ctx_t *)evt->user_data;
 
 	switch(evt->event_id) {
 	case HTTP_EVENT_ON_CONNECTED:
@@ -53,20 +126,15 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 		ESP_LOGI(TAG, "Event HTTP_EVENT_ON_STATUS_CODE");
 		break;
 	case HTTP_EVENT_ON_DATA:
-		ESP_LOGI(TAG, "Data len=%d", evt->data_len);
-		if (data->current + evt->data_len < data->capacity) {
-			memcpy(&(data->buffer[data->current]), evt->data,
-					evt->data_len);
-			data->current += evt->data_len;
-		} else {
-			ESP_LOGE(TAG, "Too much data: %zu + %zu > %zu",
-					data->current, evt->data_len,
-					data->capacity);
-		}
-		ESP_LOGI(TAG, "Data \"%.*s\"", evt->data_len, evt->data);
+		ESP_LOGI(TAG, "Event HTTP_EVENT_ON_DATA len=%d",
+				evt->data_len);
+		ESP_LOGD(TAG, "Event HTTP_EVENT_ON_DATA data=%.*s",
+				evt->data_len, evt->data);
+		process_data(data_ctx, evt->data_len, evt->data);
 		break;
 	case HTTP_EVENT_ON_FINISH:
 		ESP_LOGI(TAG, "Event HTTP_EVENT_ON_FINISH");
+		process_data(data_ctx, 0, NULL);
 		break;
 	case HTTP_EVENT_DISCONNECTED:
 		ESP_LOGI(TAG, "Event HTTP_EVENT_DISCONNECTED");
@@ -84,7 +152,8 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 static void httpc_run(void *drawhdl)
 {
 	char buf[BUFFER_SIZE] = {0};
-	data_t data = {
+	data_ctx_t data_ctx = {
+		.index = 0,
 		.buffer = buf,
 		.capacity = BUFFER_SIZE - 1,
 		.current = 0,
@@ -95,7 +164,7 @@ static void httpc_run(void *drawhdl)
 		&(esp_http_client_config_t){
 			.url = URL,
 			.event_handler = http_event_handler,
-			.user_data = &data,
+			.user_data = &data_ctx,
 		}
 	);
 
@@ -104,12 +173,10 @@ static void httpc_run(void *drawhdl)
 		ESP_LOGI(TAG, "HTTP GET Status = %d, content_length = %"PRId64,
 				esp_http_client_get_status_code(client),
 				esp_http_client_get_content_length(client));
-		ESP_LOGD(TAG, "got \"%s\"", buf);
-		// draw_main(drawhdl, buf);
 	} else {
 		ESP_LOGE(TAG, "HTTP GET request failed: %s",
 				esp_err_to_name(err));
-		draw_status(drawhdl, (char *)esp_err_to_name(err));
+		draw_main(drawhdl, 0, "", (char *)esp_err_to_name(err));
 	}
 
 	esp_http_client_cleanup(client);

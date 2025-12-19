@@ -24,7 +24,7 @@
 #define TAG "freshlist"
 
 // Refresh period in microseconds
-#define REFRESH_TIME (30 * 1000000)
+#define REFRESH_TIME (23 * 60 * 1000000)
 
 #if defined(CONFIG_HWE_DISPLAY_SPI1_HOST)
 # define SPIx_HOST SPI1_HOST
