@@ -34,6 +34,50 @@ typedef struct {
 static void *drawhdl;
 static void (*finish)(void);
 
+static void show_entry(int n, char *pfx, char *msg)
+{
+	ESP_LOGI(TAG, "%d: pfx=%s, msg=%s", n, pfx, msg);
+	struct tm when = {};
+	char tbuf[32] = {};
+	strptime(pfx, "%a %b %d %T %Y", &when);
+	strftime(tbuf, sizeof(tbuf), "%d %H:%M", &when);
+
+	// Let's compress the message
+	char *r, *w, *dot = NULL;
+	enum {
+		pass,
+		wparn,
+		wbrkt,
+	} state;
+	for (r=msg, w=msg, state = pass; *r; r++) {
+		if (state == pass) switch (*r) {
+			case '[': state = wbrkt; break;
+			case '(': state = wparn; break;
+			default: break;
+		}
+		if (state == pass) {
+			if (*r == '.') dot = w;
+			*(w++) = *r;
+		}
+		switch (state) {
+		case wparn:
+			if (*r == ')') state = pass;
+			break;
+		case wbrkt:
+			if (*r == ']') state = pass;
+			break;
+		default:
+			break;
+		}
+	}
+	if (dot) w = dot;
+	*(w--) = '\0';
+	while (w > msg && *w == ' ') *(w--) = '\0';
+
+	ESP_LOGI(TAG, "%d: pfx=%s, msg=%s", n, pfx, msg);
+	draw_main(drawhdl, n, tbuf, msg);
+}
+
 static void process_line(int n, char *l)
 {
 	char *r, *w, *f = l;
@@ -67,12 +111,7 @@ static void process_line(int n, char *l)
 	*w = '\0';
 	if (i < 2) e[i++] = f;
 	else ESP_LOGE(TAG, "csv %d: %s", i, f);
-	ESP_LOGI(TAG, "%d: pfx=%s, msg=%s", n, e[0], e[1]);
-	struct tm when = {};
-	strptime(e[0], "%a %b %d %T %Y", &when);
-	char tbuf[32] = {};
-	strftime(tbuf, sizeof(tbuf), "%d %H:%M", &when);
-	draw_main(drawhdl, n, tbuf, e[1]);
+	show_entry(n, e[0], e[1]);
 }
 
 static inline bool eol(char c)
