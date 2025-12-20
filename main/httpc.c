@@ -1,5 +1,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#ifdef DEBUG_HTTPC
+#  define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#endif
 #include <esp_log.h>
 #include <esp_http_client.h>
 // #include <esp_tls.h>
@@ -36,7 +39,7 @@ static void (*finish)(void);
 
 static void show_entry(int n, char *pfx, char *msg)
 {
-	ESP_LOGI(TAG, "%d: pfx=%s, msg=%s", n, pfx, msg);
+	ESP_LOGD(TAG, "%d: pfx=%s, msg=%s", n, pfx, msg);
 	struct tm when = {};
 	char tbuf[32] = {};
 	strptime(pfx, "%a %b %d %T %Y", &when);
@@ -74,7 +77,7 @@ static void show_entry(int n, char *pfx, char *msg)
 	*(w--) = '\0';
 	while (w > msg && *w == ' ') *(w--) = '\0';
 
-	ESP_LOGI(TAG, "%d: pfx=%s, msg=%s", n, pfx, msg);
+	ESP_LOGI(TAG, "Compressed: %d: pfx=%s, msg=%s", n, pfx, msg);
 	draw_main(drawhdl, n, tbuf, msg);
 }
 
@@ -85,7 +88,7 @@ static void process_line(int n, char *l)
 	int i = 0;
 	char *e[2] = {};
 
-	ESP_LOGI(TAG, "Line %d: %s", n, l);
+	ESP_LOGD(TAG, "Line %d: %s", n, l);
 	for (r=l, w=l, in=false; *r; r++) {
 		switch (*r) {
 		case '"':
@@ -132,11 +135,15 @@ static void process_data(data_ctx_t *data_ctx, size_t len, char *chunk)
 		got_nl = (e < chunk + len);  // Not ran into the end yet
 		sz = e - b;
 		while (e < chunk + len && eol(*e)) *(e++) = '\0';
-		ESP_LOGI(TAG,
+		ESP_LOGD(TAG,
 			"Slice b=%p, e=%p, end=%p, got_nl=%d, size=%d: %s",
 			b, e, chunk + len, got_nl, sz, b?b:"NULL");
 		// Now b points to a null-terminated line. Do we gave leftover?
 		if (data_ctx->current) {
+			ESP_LOGD(TAG, "We have letover \"%.*s\" and"
+					" new data \"%.*s\"",
+					data_ctx->current, data_ctx->buffer,
+					sz, b);
 			ln = data_ctx->buffer;
 			if (len) {  // Got anything at all or is is fin?
 				if (data_ctx->current + sz
@@ -147,15 +154,17 @@ static void process_data(data_ctx_t *data_ctx, size_t len, char *chunk)
 					data_ctx->current = data_ctx->capacity;
 				} else {
 					memcpy(data_ctx->buffer
-						+ data_ctx->current + sz,
+						+ data_ctx->current,
 						b, sz);
 					data_ctx->current += sz;
 				}
 			}
 			// We have reserved an extra byte there
 			ln[data_ctx->current] = '\0';
+			ESP_LOGD(TAG, "Combined \"%s\"", ln);
 		} else {
 			ln = b;
+			ESP_LOGD(TAG, "Complete \"%s\"", ln);
 		}
 		// Now we have a nul-terminated line `ln`. If it was newline
 		// terminated, _or_ came with len == 0 (EVENT_FINISHED),
@@ -166,6 +175,8 @@ static void process_data(data_ctx_t *data_ctx, size_t len, char *chunk)
 			}
 			data_ctx->current = 0;
 		} else {  // Don't call process_line, but save it
+			ESP_LOGD(TAG, "Saving incomplete line \"%.*s\"",
+					sz, b);
 			if (sz > data_ctx->capacity) {
 				ESP_LOGE(TAG, "line longer than buffer %d",
 						sz);
@@ -235,6 +246,9 @@ static void httpc_run(void *drawhdl)
 		.current = 0,
 	};
 
+#ifdef DEBUG_HTTPC
+	esp_log_level_set(TAG, ESP_LOG_DEBUG);
+#endif
 	ESP_LOGI(TAG, "connecting to %s", URL);
 	esp_http_client_handle_t client = esp_http_client_init(
 		&(esp_http_client_config_t){
