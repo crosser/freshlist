@@ -20,6 +20,7 @@
 #include "sdkconfig.h"
 #include "wifi.h"
 #include "display.h"
+#include "battery.h"
 
 #define TAG "freshlist"
 
@@ -196,6 +197,7 @@ static void gui_task(void *pvParameter)
 
 	ESP_LOGI(TAG, "Init LVGL Display");
 	void *drawhdl = init_display(disp, xGuiSemaphore);
+	init_battery_adc();
 	init_wifi(drawhdl);
 	start_wifi();
 

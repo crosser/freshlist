@@ -3,6 +3,7 @@ set(srcs
 	"display.c"
 	"wifi.c"
 	"httpc.c"
+	"battery.c"
 )
 
 idf_component_register(

@@ -21,6 +21,7 @@
 #include "wifi.h"
 #include "display.h"
 #include "httpc.h"
+#include "battery.h"
 
 struct wifi_creds {
         char *ssid;
@@ -106,6 +107,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 				"%c %z", &timeinfo);
 		ESP_LOGI(TAG, "Stopped at %s", strftime_buf);
 		draw_status(arg, strftime_buf);
+		battery();  // TODO actually display the result
 		running = false;
 		break;
 	case WIFI_EVENT_SCAN_DONE:
@@ -118,7 +120,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 			draw_status(arg, "Failed to allocate scan results");
 			// Mere presense of this even if not executed
 			// corrupts video memory
-			// ESP_ERROR_CHECK(esp_wifi_clear_ap_list());
+			ESP_ERROR_CHECK(esp_wifi_clear_ap_list());
 			finish();
 			break;
 		}
