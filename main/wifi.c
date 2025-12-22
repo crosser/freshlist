@@ -139,7 +139,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 			char s_ssid[34];
 			snprintf(s_ssid, sizeof(s_ssid), "%.33s",
 					ap_records[i].ssid);
-			draw_main(arg, i, s_rssi, s_ssid);
+			if (i < DISPLAY_ROWS) {
+				draw_main(arg, i, s_rssi, s_ssid);
+			}
 			if (cred_id < 0) {
 				for (int j = 0; wifi_creds[j].ssid; j++) {
 					if (!strncmp(
