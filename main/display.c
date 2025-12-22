@@ -12,6 +12,7 @@ static struct panes {
 		lv_obj_t *msg;
 	} main[DISPLAY_ROWS];
 	lv_obj_t *status;
+	lv_obj_t *battery;
 } panes = {0};
 
 static LV_STYLE_CONST_INIT(screen_style,
@@ -57,13 +58,61 @@ static LV_STYLE_CONST_INIT(status_style,
 		LV_STYLE_CONST_PAD_LEFT(2),
 		LV_STYLE_CONST_PAD_RIGHT(2),
 		LV_STYLE_CONST_HEIGHT(34),
-		LV_STYLE_CONST_WIDTH(536),  // 536 - 2*2
+		LV_STYLE_CONST_WIDTH(466),
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(48, 48, 48)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
 		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
 		LV_STYLE_CONST_TEXT_COLOR(LV_COLOR_MAKE(200, 200, 64)),
 		LV_STYLE_CONST_PROPS_END
 	}));
+
+static LV_STYLE_CONST_INIT(battery_style,
+	((static lv_style_const_prop_t []){
+		LV_STYLE_CONST_PAD_TOP(2),
+		LV_STYLE_CONST_PAD_BOTTOM(2),
+		LV_STYLE_CONST_PAD_LEFT(2),
+		LV_STYLE_CONST_PAD_RIGHT(2),
+		LV_STYLE_CONST_HEIGHT(34),
+		LV_STYLE_CONST_WIDTH(68),
+		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(0, 0, 0)),
+		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
+		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
+		LV_STYLE_CONST_TEXT_COLOR(LV_COLOR_MAKE(64, 200, 64)),
+		LV_STYLE_CONST_PROPS_END
+	}));
+
+static void battery_draw_cb(lv_event_t * e)
+{
+	lv_obj_t *obj = lv_event_get_target(e);
+	int value = (intptr_t)lv_obj_get_user_data(obj);
+	lv_draw_task_t *draw_task = lv_event_get_draw_task(e);
+	lv_draw_dsc_base_t *base_dsc = lv_draw_task_get_draw_dsc(draw_task);
+	if (base_dsc->part != LV_PART_MAIN) return;
+
+	lv_color_t colour = (value > 0) ? lv_color_make(0, 128, 0)
+					: lv_color_make(128, 0, 0);
+	lv_color_t dim = lv_color_darken(colour, 50);
+	lv_area_t obj_coords;
+	lv_obj_get_coords(obj, &obj_coords);
+	lv_area_t a = { .x1 = 2, .x2 = 60, .y1 = 2, .y2 = 26, };
+	lv_area_align(&obj_coords, &a, LV_ALIGN_CENTER, 0, 0);
+
+	lv_draw_rect_dsc_t box;
+	lv_draw_rect_dsc_init(&box);
+	box.border_width = 3;
+	box.border_color = colour;
+	box.bg_opa = LV_OPA_0;
+	lv_draw_rect(base_dsc->layer, &box, &a);
+	a.x1 += 2;
+	a.x2 = a.x1 + (value * 56 / 100) - 4;
+	a.y1 += 2;
+	a.y2 -= 2;
+	lv_draw_rect_dsc_t inside;
+	lv_draw_rect_dsc_init(&inside);
+	inside.border_width = 0;
+	inside.bg_color = dim;
+	lv_draw_rect(base_dsc->layer, &inside, &a);
+}
 
 void *init_display(lv_display_t *disp, SemaphoreHandle_t xGuiSemaphore)
 {
@@ -95,10 +144,17 @@ void *init_display(lv_display_t *disp, SemaphoreHandle_t xGuiSemaphore)
     }
     obj = lv_label_create(scr);
     lv_obj_add_style(obj, &status_style, LV_PART_MAIN);
-    lv_obj_align(obj, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(obj, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     lv_label_set_long_mode(obj, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text_static(obj, " ");
     panes.status = obj;
+    obj = lv_label_create(scr);
+    lv_obj_add_style(obj, &battery_style, LV_PART_MAIN);
+    lv_obj_align(obj, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+    lv_label_set_text_static(obj, " ");
+    lv_obj_add_event_cb(obj, battery_draw_cb, LV_EVENT_DRAW_TASK_ADDED, NULL);
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
+    panes.battery = obj;
     return (void *)&panes;
 }
 
@@ -134,6 +190,24 @@ void draw_status(void *hdl, char *msg)
 	if (pdTRUE == xSemaphoreTake(semaphore, portMAX_DELAY)) {
 		lv_obj_clean(lbl);
 		lv_label_set_text(lbl, msg);
+		xSemaphoreGive(semaphore);
+	}
+}
+
+void draw_battery(void *hdl, int level)
+{
+	char clevel[8];
+	ESP_LOGI(TAG, "Drawing battery %d%%", level);
+	if (level < 0) level = 0;
+	if (level > 100) level = 100;
+	snprintf(clevel, sizeof(clevel), "%02u%%", level);
+	SemaphoreHandle_t semaphore = ((struct panes *)hdl)->semaphore;
+	lv_obj_t *lbl = ((struct panes *)hdl)->battery;
+	if (pdTRUE == xSemaphoreTake(semaphore, portMAX_DELAY)) {
+		lv_obj_clean(lbl);
+		// lv_label_set_text(lbl, clevel);
+		lv_obj_set_user_data(lbl, (void*)level);
+		lv_obj_invalidate(lbl);
 		xSemaphoreGive(semaphore);
 	}
 }
