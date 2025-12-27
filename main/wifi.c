@@ -155,6 +155,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 			}
 		}
 		free(ap_records);
+		for (int i = ap_num; i < DISPLAY_ROWS; i++) {
+			draw_main(arg, i, "", "");
+		}
 		if (cred_id < 0) {
 			ESP_LOGI(TAG, "Did not find matching credentials");
 			draw_status(arg, "Did not find matching credentials");

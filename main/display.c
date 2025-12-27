@@ -28,7 +28,7 @@ static LV_STYLE_CONST_INIT(main_pfx_style,
 		LV_STYLE_CONST_PAD_LEFT(2),
 		LV_STYLE_CONST_PAD_RIGHT(2),
 		LV_STYLE_CONST_HEIGHT(34),
-		LV_STYLE_CONST_WIDTH(116),
+		LV_STYLE_CONST_WIDTH(122),
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(48, 64, 48)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
 		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
@@ -43,7 +43,7 @@ static LV_STYLE_CONST_INIT(main_msg_style,
 		LV_STYLE_CONST_PAD_LEFT(2),
 		LV_STYLE_CONST_PAD_RIGHT(2),
 		LV_STYLE_CONST_HEIGHT(34),
-		LV_STYLE_CONST_WIDTH(418),
+		LV_STYLE_CONST_WIDTH(412),
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(32, 32, 64)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
 		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
@@ -58,7 +58,7 @@ static LV_STYLE_CONST_INIT(status_style,
 		LV_STYLE_CONST_PAD_LEFT(2),
 		LV_STYLE_CONST_PAD_RIGHT(2),
 		LV_STYLE_CONST_HEIGHT(34),
-		LV_STYLE_CONST_WIDTH(466),
+		LV_STYLE_CONST_WIDTH(460),
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(48, 48, 48)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
 		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
@@ -73,14 +73,15 @@ static LV_STYLE_CONST_INIT(battery_style,
 		LV_STYLE_CONST_PAD_LEFT(2),
 		LV_STYLE_CONST_PAD_RIGHT(2),
 		LV_STYLE_CONST_HEIGHT(34),
-		LV_STYLE_CONST_WIDTH(68),
+		LV_STYLE_CONST_WIDTH(74),
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(0, 0, 0)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
 		LV_STYLE_CONST_TEXT_FONT(&lv_font_montserrat_28),
-		LV_STYLE_CONST_TEXT_COLOR(LV_COLOR_MAKE(64, 200, 64)),
+		LV_STYLE_CONST_TEXT_COLOR(LV_COLOR_MAKE(200, 200, 200)),
 		LV_STYLE_CONST_PROPS_END
 	}));
 
+#if (! CONFIG_RAW_BATTERY_DISPLAY)
 static void battery_draw_cb(lv_event_t * e)
 {
 	lv_obj_t *obj = lv_event_get_target(e);
@@ -113,6 +114,7 @@ static void battery_draw_cb(lv_event_t * e)
 	inside.bg_color = dim;
 	lv_draw_rect(base_dsc->layer, &inside, &a);
 }
+#endif
 
 void *init_display(lv_display_t *disp, SemaphoreHandle_t xGuiSemaphore)
 {
@@ -152,8 +154,10 @@ void *init_display(lv_display_t *disp, SemaphoreHandle_t xGuiSemaphore)
     lv_obj_add_style(obj, &battery_style, LV_PART_MAIN);
     lv_obj_align(obj, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     lv_label_set_text_static(obj, " ");
+#if (! CONFIG_RAW_BATTERY_DISPLAY)
     lv_obj_add_event_cb(obj, battery_draw_cb, LV_EVENT_DRAW_TASK_ADDED, NULL);
     lv_obj_add_flag(obj, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
+#endif
     panes.battery = obj;
     return (void *)&panes;
 }
@@ -194,20 +198,25 @@ void draw_status(void *hdl, char *msg)
 	}
 }
 
-void draw_battery(void *hdl, int level)
+void draw_battery(void *hdl, int mV)
 {
-	char clevel[8];
-	ESP_LOGI(TAG, "Drawing battery %d%%", level);
-	if (level < 0) level = 0;
-	if (level > 100) level = 100;
-	snprintf(clevel, sizeof(clevel), "%02u%%", level);
+	ESP_LOGI(TAG, "Drawing battery %d mV", mV);
 	SemaphoreHandle_t semaphore = ((struct panes *)hdl)->semaphore;
 	lv_obj_t *lbl = ((struct panes *)hdl)->battery;
 	if (pdTRUE == xSemaphoreTake(semaphore, portMAX_DELAY)) {
 		lv_obj_clean(lbl);
-		// lv_label_set_text(lbl, clevel);
+#if CONFIG_RAW_BATTERY_DISPLAY
+		char clevel[8];
+		snprintf(clevel, sizeof(clevel), "%u", mV);
+		lv_label_set_text(lbl, clevel);
+#else
+		int level = (mV - CONFIG_BATTERY_ADC_MIN) * 100 /
+			(CONFIG_BATTERY_ADC_MAX - CONFIG_BATTERY_ADC_MIN);
+		if (level < 0) level = 0;
+		if (level > 100) level = 100;
 		lv_obj_set_user_data(lbl, (void*)level);
 		lv_obj_invalidate(lbl);
+#endif
 		xSemaphoreGive(semaphore);
 	}
 }

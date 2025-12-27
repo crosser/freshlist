@@ -87,6 +87,22 @@ menu "Hardware Environment (PINS, screen, etc.)"
 		int "Battery voltage ADC pin number"
 		default 4
 
+	config BATTERY_ADC_MIN
+		int "Battery ADC min votage (mV)"
+		default 1450
+		help
+			ADC reading corresponding to voltage of
+			fully discharged battery. On many dev boards,
+			half of battery voltage. 2.9V -> 1450 adc value
+
+	config BATTERY_ADC_MAX
+		int "Battery ADC max votage (mV)"
+		default 2050
+		help
+			ADC reading corresponding to voltage of
+			fully charged battery. On many dev boards,
+			half of battery voltage. 4.1V -> 2050 adc value
+
 	config HWE_BUTTON_1
 		int "Button 1 GPIO pin number"
 		default 0
@@ -107,7 +123,7 @@ menu "WiFi name and WPAx password"
 
 endmenu
 
-menu "Time Zone and URL"
+menu "Time Zone, URL, miscellany"
 
 	config TZSPEC
 		string "Timezone with daylight change rules"
@@ -115,5 +131,8 @@ menu "Time Zone and URL"
 	config URL
 		string "URL of the last changed files .csv"
 		default "https://downloads.example.com/latest.txt"
+	config RAW_BATTERY_DISPLAY
+		bool "Display battery ADC in mV vs. % of full charge"
+		default no
 
 endmenu
