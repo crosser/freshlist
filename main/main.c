@@ -234,6 +234,13 @@ static void gui_task(void *pvParameter)
 	ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, false));
 	ESP_ERROR_CHECK(gpio_set_level(CONFIG_HWE_DISPLAY_PWR,
 				!CONFIG_HWE_DISPLAY_PWR_ON_LEVEL));
+	ESP_ERROR_CHECK(gpio_config(&(gpio_config_t) {
+				.pin_bit_mask = 1ULL<<CONFIG_HWE_BUTTON_1,
+				.mode = GPIO_MODE_OUTPUT,
+				.pull_up_en = GPIO_PULLUP_DISABLE,
+				.pull_down_en = GPIO_PULLDOWN_DISABLE,
+				.intr_type = GPIO_INTR_DISABLE,
+			}));
 	esp_deep_sleep_start();
 }
 
