@@ -1,6 +1,7 @@
 #include <esp_log.h>
 #include <esp_adc/adc_oneshot.h>
 #include <esp_adc/adc_cali_scheme.h>
+#include <driver/gpio.h>
 
 #include "sdkconfig.h"
 #include "battery.h"
@@ -30,16 +31,14 @@
 static adc_channel_t channel;
 static adc_oneshot_unit_handle_t handle;
 static adc_cali_handle_t cali;
+static bool nobatt = false;
 
-void init_battery_adc(void)
+static void init_adc(int pin)
 {
 	adc_unit_t unit;
 
-	ESP_ERROR_CHECK(adc_oneshot_io_to_channel(CONFIG_HWE_BATTERY_ADC,
-				&unit, &channel));
-	ESP_LOGI(TAG, "GPIO %d gave us unit %d (exp. %d) chan %d (exp %d)",
-			CONFIG_HWE_BATTERY_ADC, unit, ADC_UNIT_1,
-			channel, ADC_CHANNEL_3);
+	ESP_ERROR_CHECK(adc_oneshot_io_to_channel(pin, &unit, &channel));
+	ESP_LOGI(TAG, "GPIO %d gave us unit %d chan %d", pin, unit, channel);
 	ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(
 			&(adc_cali_curve_fitting_config_t){
 				.unit_id = unit,
@@ -60,8 +59,34 @@ void init_battery_adc(void)
 			}));
 }
 
+void init_battery_adc(void)
+{
+	int pins[] = {CONFIG_HWE_BATTERY_ADC_1, CONFIG_HWE_BATTERY_ADC_2};
+	int i, value = 0;
+
+	for (i = 0; i < sizeof(pins) / sizeof(int); i++) {
+		init_adc(pins[i]);
+		ESP_ERROR_CHECK(gpio_set_pull_mode(pins[i],
+					GPIO_PULLDOWN_ONLY));
+		ESP_ERROR_CHECK(adc_oneshot_get_calibrated_result(
+				handle, cali, channel, &value));
+		ESP_ERROR_CHECK(gpio_set_pull_mode(pins[i], GPIO_FLOATING));
+		if (value > 0) break;
+		ESP_ERROR_CHECK(adc_oneshot_del_unit(handle));
+	}
+	if (i < sizeof(pins) / sizeof(int)) {
+		ESP_LOGI(TAG, "Using pin %d: value with pulldown: %d",
+				pins[i], value);
+	} else {
+		ESP_LOGI(TAG, "Could not find battery ADC");
+		nobatt = true;
+	}
+}
+
 int battery(void)
 {
+	if (nobatt) return 0;
+
 	int value = 0;
 	ESP_ERROR_CHECK(adc_oneshot_get_calibrated_result(
 			handle, cali, channel, &value));

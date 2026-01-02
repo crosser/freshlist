@@ -83,9 +83,13 @@ menu "Hardware Environment (PINS, screen, etc.)"
 		int "Which GPIO level is 'display on' (0 or 1)"
 		default 1
 
-	config HWE_BATTERY_ADC
-		int "Battery voltage ADC pin number"
+	config HWE_BATTERY_ADC_1
+		int "Battery voltage ADC pin number to try first"
 		default 4
+
+	config HWE_BATTERY_ADC_2
+		int "Battery voltage ADC pin number to try next"
+		default 1
 
 	config BATTERY_ADC_MIN
 		int "Battery ADC min votage (mV)"
