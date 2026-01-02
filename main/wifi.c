@@ -121,7 +121,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 			// Mere presense of this even if not executed
 			// corrupts video memory
 			// ESP_ERROR_CHECK(esp_wifi_clear_ap_list());
-			finish();
+			ESP_ERROR_CHECK(esp_wifi_stop());
 			break;
 		}
 		ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(
@@ -161,7 +161,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		if (cred_id < 0) {
 			ESP_LOGI(TAG, "Did not find matching credentials");
 			draw_status(arg, "Did not find matching credentials");
-			finish();
+			ESP_ERROR_CHECK(esp_wifi_stop());
 			break;
 		}
 		ESP_LOGI(TAG, "Found known AP \"%s\", connecting",
