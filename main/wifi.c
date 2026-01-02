@@ -120,7 +120,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 			draw_status(arg, "Failed to allocate scan results");
 			// Mere presense of this even if not executed
 			// corrupts video memory
-			ESP_ERROR_CHECK(esp_wifi_clear_ap_list());
+			// ESP_ERROR_CHECK(esp_wifi_clear_ap_list());
 			finish();
 			break;
 		}

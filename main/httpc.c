@@ -1,3 +1,4 @@
+#include <string.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #ifdef DEBUG_HTTPC
@@ -26,6 +27,15 @@
 #define TAG "httpc"
 
 #define BUFFER_SIZE 256
+
+char *junk[] = {
+	".1080p",
+	".720p",
+	".HEVC",
+	".BDRIP",
+	".WEBRIP",
+	NULL,
+};
 
 typedef struct {
 	int index;
@@ -76,6 +86,12 @@ static void show_entry(int n, char *pfx, char *msg)
 	if (dot) w = dot;
 	*(w--) = '\0';
 	while (w > msg && *w == ' ') *(w--) = '\0';
+	// Let's try to get rid of more non-essential text
+	for (char **s = junk; *s; s++) {
+		if ((w = strstr(msg, *s))) {
+			*w = '\0';
+		}
+	}
 
 	ESP_LOGI(TAG, "Compressed: %d: pfx=%s, msg=%s", n, pfx, msg);
 	draw_main(drawhdl, n, tbuf, msg);
