@@ -46,6 +46,37 @@ static struct wifi_creds wifi_creds[] = {
 
 static const char *TAG = "WiFi";
 
+static void update_nvs_battery(int voltage, time_t now)
+{
+	nvs_handle_t handle;
+	int32_t old_voltage;
+	int64_t old_time;
+	esp_err_t err;
+
+	ESP_ERROR_CHECK(nvs_open("battery_state", NVS_READWRITE, &handle));
+	switch ((err = nvs_get_i32(handle, "voltage", &old_voltage))) {
+	case ESP_ERR_NVS_NOT_FOUND:
+		ESP_LOGI(TAG, "No old voltage data");
+		old_voltage = 99999;
+		break;
+	case ESP_OK:
+		ESP_ERROR_CHECK(nvs_get_i64(handle, "time", &old_time));
+		ESP_LOGI(TAG, "Old voltage %d at %lld, new %d",
+				old_voltage, old_time, voltage);
+		break;
+	default:
+		ESP_LOGE(TAG, "error %s reading nvs", esp_err_to_name(err));
+		break;
+	}
+	if (voltage < old_voltage) {
+		ESP_LOGI(TAG, "Saving new value");
+		ESP_ERROR_CHECK(nvs_set_i32(handle, "voltage", voltage));
+		ESP_ERROR_CHECK(nvs_set_i64(handle, "time", (int64_t)now));
+		ESP_ERROR_CHECK(nvs_commit(handle));
+	}
+	nvs_close(handle);
+}
+
 #define HAVE_IPV4 BIT0
 #define HAVE_IPV6 BIT1
 #define WIFI_FAIL BIT2
@@ -107,7 +138,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 				"%c %z", &timeinfo);
 		ESP_LOGI(TAG, "Stopped at %s", strftime_buf);
 		draw_status(arg, strftime_buf);
-		draw_battery(arg, battery());
+		int voltage = battery();
+		update_nvs_battery(voltage, now);
+		draw_battery(arg, voltage);
 		running = false;
 		break;
 	case WIFI_EVENT_SCAN_DONE:
