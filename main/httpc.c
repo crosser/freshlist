@@ -92,6 +92,8 @@ static void show_entry(int n, char *pfx, char *msg)
 			*w = '\0';
 		}
 	}
+	// Finally, there may be whitespace at the beginning
+	while (*msg == ' ') msg++;  // Guaranteed to terminate on NUL
 
 	ESP_LOGI(TAG, "Compressed: %d: pfx=%s, msg=%s", n, pfx, msg);
 	draw_main(drawhdl, n, tbuf, msg);
