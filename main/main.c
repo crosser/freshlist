@@ -198,7 +198,8 @@ static void gui_task(void *pvParameter)
 	ESP_LOGI(TAG, "Init LVGL Display");
 	void *drawhdl = init_display(disp, xGuiSemaphore);
 	init_battery_adc();
-	init_wifi(drawhdl);
+	bool stop_request = false;
+	init_wifi(drawhdl, &stop_request);
 	start_wifi();
 
 	esp_timer_handle_t fetch_timer;
@@ -211,8 +212,9 @@ static void gui_task(void *pvParameter)
 	ESP_ERROR_CHECK(esp_timer_start_periodic(fetch_timer, REFRESH_TIME));
 
 	int oldlvl = 1;
-	int stop_request = 0;
-	while (stop_request < 100) {
+	time_t oldtime, newtime;
+	time(&oldtime);
+	while (!stop_request) {
 		vTaskDelay(pdMS_TO_TICKS(10));
 		if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY)) {
 			lv_task_handler();
@@ -221,8 +223,12 @@ static void gui_task(void *pvParameter)
 		int lvl = gpio_get_level(CONFIG_HWE_BUTTON_1);
 		// ESP_LOGI(TAG, "stop request = %d, level = %d",
 		//		stop_request, lvl);
-		if (lvl) stop_request = 0;
-		else stop_request++;
+		if (lvl) {
+			time(&oldtime);
+		} else {
+			time(&newtime);
+			if (newtime - oldtime > 3) break;
+		}
 		if (lvl && !oldlvl) start_wifi();
 		oldlvl = lvl;
 	}

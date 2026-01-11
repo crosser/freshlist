@@ -71,7 +71,7 @@ void init_battery_adc(void)
 		ESP_ERROR_CHECK(adc_oneshot_get_calibrated_result(
 				handle, cali, channel, &value));
 		ESP_ERROR_CHECK(gpio_set_pull_mode(pins[i], GPIO_FLOATING));
-		if (value > 0) break;
+		if (value > 100) break;
 		ESP_ERROR_CHECK(adc_oneshot_del_unit(handle));
 	}
 	if (i < sizeof(pins) / sizeof(int)) {

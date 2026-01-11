@@ -85,6 +85,7 @@ static bool need_conn_action;
 static int retries;
 static esp_netif_t *wifi_netif;
 static bool running = false;
+static bool *stop_request;
 
 static void on_ready(void *drawhdl)
 {
@@ -95,7 +96,7 @@ static void on_ready(void *drawhdl)
 				"pool.ntp.org"
 			)));
 	} else {
-		ESP_LOGI(TAG, "on_read action taken already");
+		ESP_LOGI(TAG, "on_ready action taken already");
 	}
 }
 
@@ -141,6 +142,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		int voltage = battery();
 		update_nvs_battery(voltage, now);
 		draw_battery(arg, voltage);
+		if (voltage < CONFIG_BATTERY_ADC_MIN) {
+			*stop_request = true;
+		}
 		running = false;
 		break;
 	case WIFI_EVENT_SCAN_DONE:
@@ -276,9 +280,10 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 	}
 }
 
-void init_wifi(void *drawhdl)
+void init_wifi(void *drawhdl, bool *stop_ptr)
 {
 	running = false;
+	stop_request = stop_ptr;
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
 	esp_err_t ret = nvs_flash_init();
 	if (ret == ESP_ERR_NVS_NO_FREE_PAGES
