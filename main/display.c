@@ -19,6 +19,7 @@ static LV_STYLE_CONST_INIT(screen_style,
 	((static lv_style_const_prop_t []){
 		LV_STYLE_CONST_BG_COLOR(LV_COLOR_MAKE(0, 0, 0)),
 		LV_STYLE_CONST_BG_OPA(LV_OPA_100),
+		LV_STYLE_CONST_PROPS_END
 	}));
 
 static LV_STYLE_CONST_INIT(main_pfx_style,
